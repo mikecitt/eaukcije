@@ -1,0 +1,8 @@
+{
+  "name": "eaukcije-client",
+  "version": "0.2.0",
+  "description": "Serbian court auction browser — pure client-side app",
+  "scripts": {
+    "start": "node proxy.js"
+  }
+}

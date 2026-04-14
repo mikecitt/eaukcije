@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EAukcija - Serbian Court Auctions</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2em;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 0.95em;
+    }
+
+    .controls {
+      padding: 20px 30px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 1em;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    .status.loading {
+      color: #667eea;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(102, 126, 234, 0.3);
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .stat-box {
+      background: #f7f7f7;
+      padding: 15px;
+      border-radius: 5px;
+      border-left: 4px solid #667eea;
+    }
+
+    .stat-label {
+      font-size: 0.85em;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95em;
+    }
+
+    thead {
+      background: #f7f7f7;
+      border-bottom: 2px solid #ddd;
+    }
+
+    th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #eee;
+      color: #555;
+    }
+
+    tbody tr:hover {
+      background: #f9f9f9;
+    }
+
+    a {
+      transition: color 0.2s ease;
+    }
+
+    a:hover {
+      color: #764ba2 !important;
+      text-decoration: underline !important;
+    }
+
+    td.number {
+      text-align: center;
+      color: #999;
+      width: 40px;
+    }
+
+    td.price {
+      text-align: right;
+      font-weight: 500;
+      color: #667eea;
+    }
+
+    td.status {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      font-weight: 500;
+      width: fit-content;
+    }
+
+    td.status.verified   { background: #d4edda; color: #155724; }
+    td.status.unverified { background: #fff3cd; color: #856404; }
+    td.status.cancelled  { background: #f8d7da; color: #721c24; }
+    td.status.completed  { background: #d1ecf1; color: #0c5460; }
+
+    .date {
+      font-size: 0.85em;
+      color: #999;
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      border-left: 4px solid #721c24;
+    }
+
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      border-left: 4px solid #0c5460;
+      font-size: 0.9em;
+    }
+
+    @media (max-width: 768px) {
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .controls .btn {
+        width: 100%;
+      }
+
+      .status {
+        margin-left: 0;
+        margin-top: 10px;
+      }
+
+      .header h1 { font-size: 1.5em; }
+      table { font-size: 0.85em; }
+      th, td { padding: 10px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Nepokretnosti (Immovable Properties)</h1>
+      <p>Real-time auction data from eaukcija.sud.rs</p>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="reloadBtn">Reload Data</button>
+      <button class="btn btn-primary" id="enrichBtn" disabled
+        style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); margin-left: 10px; opacity: 0.6; cursor: not-allowed;"
+        title="Click Reload Data first">
+        Enrich Details
+      </button>
+      <button class="btn btn-primary" id="clearBtn"
+        style="background: #dc3545; margin-left: 10px;">
+        Clear Storage
+      </button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="content">
+      <div id="msgContainer"></div>
+
+      <div class="stats">
+        <div class="stat-box">
+          <div class="stat-label">Total Auctions</div>
+          <div class="stat-value" id="statsCount">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Enriched</div>
+          <div class="stat-value" id="statsEnriched">-</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Last Updated</div>
+          <div class="stat-value" id="statsTime" style="font-size: 1em;">-</div>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="auctionsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Auction Number</th>
+              <th>Description</th>
+              <th>Place</th>
+              <th>Status</th>
+              <th>Starting Price</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Type</th>
+              <th>First Sale</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr>
+              <td colspan="10" style="text-align: center; color: #999; padding: 40px;">
+                Click "Reload Data" to fetch auctions
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── Config ────────────────────────────────────────────────────────────────
+    // When served via proxy.js, use the same origin (no CORS); otherwise direct.
+    const API_BASE = window.location.hostname === 'localhost'
+      ? `${window.location.origin}/WebApi.Proxy/api/EAukcija`
+      : 'https://eaukcija.sud.rs/WebApi.Proxy/api/EAukcija';
+    const STORAGE_KEY = 'aukcije_v1';
+    const CATEGORY_ID = '7';
+
+    // ─── DOM refs ──────────────────────────────────────────────────────────────
+    const reloadBtn      = document.getElementById('reloadBtn');
+    const enrichBtn      = document.getElementById('enrichBtn');
+    const clearBtn       = document.getElementById('clearBtn');
+    const tableBody      = document.getElementById('tableBody');
+    const statusEl       = document.getElementById('status');
+    const msgContainer   = document.getElementById('msgContainer');
+    const statsCount     = document.getElementById('statsCount');
+    const statsEnriched  = document.getElementById('statsEnriched');
+    const statsTime      = document.getElementById('statsTime');
+
+    // ─── State ─────────────────────────────────────────────────────────────────
+    let currentAuctions = [];
+    let isBusy = false;
+
+    // ─── Storage ───────────────────────────────────────────────────────────────
+    function saveToStorage(auctions, lastSync) {
+      const data = { auctions, lastSync };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        showMsg('warning', 'localStorage full — data not saved. Try clearing storage.');
+      }
+    }
+
+    function loadFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function clearStorage() {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    // Build a map of auctionId -> Place from previously stored auctions
+    function buildPlaceCache(storedAuctions) {
+      const cache = {};
+      if (!storedAuctions) return cache;
+      for (const a of storedAuctions) {
+        if (a._placeEnriched && a.Place) {
+          cache[a.Id] = a.Place;
+        }
+      }
+      return cache;
+    }
+
+    // ─── API ───────────────────────────────────────────────────────────────────
+    async function apiPost(endpoint, payload) {
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.ResultCode !== '0') throw new Error(`API: ${data.ResultMessage} (${data.ResultCode})`);
+      return data.Data;
+    }
+
+    async function fetchAllAuctions() {
+      const all = [];
+      let page = 1;
+      const itemCount = 500;
+
+      while (true) {
+        const data = await apiPost('/GetAuctionsByCategoryId', {
+          CategoryId: CATEGORY_ID,
+          ItemCount: itemCount,
+          PageCount: page.toString(),
+        });
+
+        const auctions = data.Auctions;
+        all.push(...auctions);
+        setStatus(`Fetching... ${all.length} auctions so far`, true);
+
+        if (auctions.length < itemCount) break;
+        page++;
+      }
+
+      return all;
+    }
+
+    async function fetchPropertyDetails(auctionId) {
+      return await apiPost('/GetImmovablePropertyDetails', {
+        AuctionId: auctionId.toString(),
+        Role: null,
+      });
+    }
+
+    // ─── Formatting ────────────────────────────────────────────────────────────
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDateOnly(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleDateString();
+    }
+
+    function formatPrice(price) {
+      if (price == null) return '-';
+      return new Intl.NumberFormat('sr-RS', { style: 'currency', currency: 'RSD', minimumFractionDigits: 0 }).format(price);
+    }
+
+    function getStatusClass(status) {
+      const s = status.toLowerCase();
+      if (s.includes('verified') || s.includes('потврђ')) return 'verified';
+      if (s.includes('cancel')) return 'cancelled';
+      if (s.includes('complet')) return 'completed';
+      return 'unverified';
+    }
+
+    // ─── UI helpers ────────────────────────────────────────────────────────────
+    function showMsg(type, html) {
+      const cls = type === 'error' ? 'error' : 'info';
+      msgContainer.innerHTML = `<div class="${cls}">${html}</div>`;
+    }
+
+    function clearMsg() {
+      msgContainer.innerHTML = '';
+    }
+
+    function setStatus(msg, loading = false) {
+      if (!msg) { statusEl.innerHTML = ''; return; }
+      statusEl.className = 'status' + (loading ? ' loading' : '');
+      statusEl.innerHTML = loading
+        ? `<span class="spinner"></span> ${msg}`
+        : msg;
+    }
+
+    function setBusy(busy) {
+      isBusy = busy;
+      reloadBtn.disabled = busy;
+      clearBtn.disabled  = busy;
+    }
+
+    function enableEnrich() {
+      enrichBtn.disabled = false;
+      enrichBtn.style.opacity = '1';
+      enrichBtn.style.cursor  = 'pointer';
+    }
+
+    function disableEnrich() {
+      enrichBtn.disabled = true;
+      enrichBtn.style.opacity = '0.6';
+      enrichBtn.style.cursor  = 'not-allowed';
+    }
+
+    function updateStats(auctions, lastSync) {
+      statsCount.textContent    = auctions.length;
+      statsEnriched.textContent = auctions.filter(a => a._placeEnriched).length;
+      statsTime.textContent     = lastSync ? formatDate(lastSync) : '-';
+    }
+
+    // ─── Sorting ───────────────────────────────────────────────────────────────
+    function sortByPlace(auctions) {
+      return [...auctions].sort((a, b) => {
+        const pA = a.Place?.Name || '';
+        const pB = b.Place?.Name || '';
+        if (!pA && pB)  return -1;
+        if (pA && !pB)  return 1;
+        if (!pA && !pB) return 0;
+        return pA.localeCompare(pB);
+      });
+    }
+
+    // ─── Render ────────────────────────────────────────────────────────────────
+    function renderAuctions(auctions) {
+      if (!auctions || auctions.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:40px;">No auctions found</td></tr>';
+        return;
+      }
+
+      const sorted = sortByPlace(auctions);
+      tableBody.innerHTML = sorted.map((a, i) => `
+        <tr>
+          <td class="number">${i + 1}</td>
+          <td><a href="https://eaukcija.sud.rs/#/aukcije/${a.Id}" target="_blank"
+              style="color:#667eea;text-decoration:none;font-weight:500;">
+              <strong>${a.AuctionNumber}</strong></a></td>
+          <td title="${a.ShortDescription}">${a.ShortDescription.substring(0, 40)}${a.ShortDescription.length > 40 ? '...' : ''}</td>
+          <td>
+            <strong>${a.Place?.Name || '—'}</strong>
+            ${a.Place?.Municipality ? `<br/><small style="color:#999;">${a.Place.Municipality}</small>` : ''}
+          </td>
+          <td class="status ${getStatusClass(a.Status)}">${a.StatusTranslation}</td>
+          <td class="price">${formatPrice(a.StartingPrice)}</td>
+          <td class="date">${formatDateOnly(a.StartDate)}</td>
+          <td class="date">${formatDateOnly(a.EndDate)}</td>
+          <td>${a.PropertyType}</td>
+          <td>${a.IsFirstSale ? '✅' : '❌'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ─── Actions ───────────────────────────────────────────────────────────────
+    async function reloadData() {
+      setBusy(true);
+      disableEnrich();
+      setStatus('Fetching auctions from API...', true);
+      clearMsg();
+
+      try {
+        // Preserve previously enriched Place data
+        const stored    = loadFromStorage();
+        const placeCache = buildPlaceCache(stored?.auctions);
+
+        const rawAuctions = await fetchAllAuctions();
+        const now = new Date().toISOString();
+
+        // Merge Place data from cache
+        const auctions = rawAuctions.map(a => {
+          const cached = placeCache[a.Id];
+          return cached
+            ? { ...a, Place: cached, _placeEnriched: true }
+            : { ...a, Place: null, _placeEnriched: false };
+        });
+
+        currentAuctions = auctions;
+        saveToStorage(auctions, now);
+        renderAuctions(auctions);
+        updateStats(auctions, now);
+        enableEnrich();
+
+        const enriched = auctions.filter(a => a._placeEnriched).length;
+        setStatus(`Loaded ${auctions.length} auctions (${enriched} already enriched)`);
+        setTimeout(() => setStatus(''), 5000);
+      } catch (err) {
+        console.error(err);
+        const isCors = err.message?.includes('Failed to fetch') || err instanceof TypeError;
+        showMsg('error', isCors
+          ? `<strong>CORS error</strong> — the API blocks direct browser requests.<br>
+             Run a local proxy or use the Node.js server version instead.<br>
+             <small>Error: ${err.message}</small>`
+          : `Failed to reload: ${err.message}`);
+        setStatus('');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function enrichDetails() {
+      const pending = currentAuctions.filter(a => !a._placeEnriched);
+      if (pending.length === 0) {
+        setStatus('All auctions already enriched');
+        setTimeout(() => setStatus(''), 3000);
+        return;
+      }
+
+      disableEnrich();
+      setBusy(true);
+      clearMsg();
+
+      let enriched = 0;
+      let failed   = 0;
+
+      for (let i = 0; i < pending.length; i++) {
+        const a = pending[i];
+        setStatus(`Enriching ${i + 1} / ${pending.length}...`, true);
+
+        try {
+          const details = await fetchPropertyDetails(a.Id);
+          // Update in currentAuctions array
+          const idx = currentAuctions.findIndex(x => x.Id === a.Id);
+          if (idx !== -1) {
+            currentAuctions[idx] = { ...currentAuctions[idx], Place: details.Place, _placeEnriched: true };
+          }
+          enriched++;
+        } catch (err) {
+          console.warn(`Failed to enrich ${a.Id}:`, err.message);
+          failed++;
+        }
+      }
+
+      // Save updated data
+      const now = new Date().toISOString();
+      saveToStorage(currentAuctions, now);
+      renderAuctions(currentAuctions);
+      updateStats(currentAuctions, now);
+
+      enableEnrich();
+      setBusy(false);
+
+      const msg = `Enriched ${enriched} auctions` + (failed ? `, ${failed} failed` : '');
+      setStatus(msg);
+      setTimeout(() => setStatus(''), 5000);
+    }
+
+    function clearStorageAction() {
+      if (!confirm('Clear all stored auction data?')) return;
+      clearStorage();
+      currentAuctions = [];
+      tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:40px;">Storage cleared. Click "Reload Data" to fetch auctions.</td></tr>';
+      statsCount.textContent   = '-';
+      statsEnriched.textContent = '-';
+      statsTime.textContent    = '-';
+      disableEnrich();
+      clearMsg();
+    }
+
+    // ─── Init ──────────────────────────────────────────────────────────────────
+    function init() {
+      const stored = loadFromStorage();
+      if (stored?.auctions?.length) {
+        currentAuctions = stored.auctions;
+        renderAuctions(currentAuctions);
+        updateStats(currentAuctions, stored.lastSync);
+        enableEnrich();
+        setStatus(`Loaded ${currentAuctions.length} auctions from storage`);
+        setTimeout(() => setStatus(''), 4000);
+      }
+    }
+
+    reloadBtn.addEventListener('click', reloadData);
+    enrichBtn.addEventListener('click', enrichDetails);
+    clearBtn.addEventListener('click', clearStorageAction);
+
+    init();
+  </script>
+</body>
+</html>
