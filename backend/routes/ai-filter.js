@@ -1,22 +1,28 @@
 const express   = require('express');
 const Anthropic  = require('@anthropic-ai/sdk');
+const db         = require('../db');
 
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-  const { description, auctions } = req.body;
+  const { description, ids } = req.body;
 
-  if (!description || !Array.isArray(auctions) || auctions.length === 0) {
-    return res.status(400).json({ error: 'Nedostaje opis ili lista aukcija.' });
+  if (!description || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Nedostaje opis ili lista ID-eva.' });
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY nije podešen na serveru.' });
   }
 
-  const client = new Anthropic();
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db.prepare(`
+    SELECT id, short_description, place_name, place_municipality,
+           starting_price, property_type, is_first_sale
+    FROM auctions WHERE id IN (${placeholders})
+  `).all(...ids);
 
-  const auctionList = auctions.map(a => ({
+  const auctionList = rows.map(a => ({
     id:           a.id,
     opis:         (a.short_description || '').slice(0, 120),
     mesto:        [a.place_name, a.place_municipality].filter(Boolean).join(', '),
@@ -24,6 +30,8 @@ router.post('/', async (req, res) => {
     tip:          a.property_type  || '',
     prva_prodaja: a.is_first_sale  ? 'da' : 'ne',
   }));
+
+  const client = new Anthropic();
 
   const prompt = `Ti si asistent koji filtrira liste aukcija nepokretnosti. \
 Korisnik želi aukcije koje odgovaraju sledećem kriterijumu:

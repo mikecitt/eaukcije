@@ -1051,7 +1051,7 @@
       const res = await fetch('/api/ai-filter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: query, auctions: baseFiltered }),
+        body: JSON.stringify({ description: query, ids: baseFiltered.map(a => a.id) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
