@@ -1,22 +1,23 @@
 import { Injectable, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuctionsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
-    const { rows: auctions } = await this.db.query(`
-      SELECT id, auction_number, short_description, place_name, place_municipality,
-             status, status_translation, starting_price, start_date, end_date,
-             property_type, is_first_sale, details_fetched, added_at
-      FROM auctions ORDER BY added_at DESC
-    `);
-    const { rows } = await this.db.query(
-      'SELECT value FROM meta WHERE key = $1',
-      ['last_refresh'],
-    );
-    return { auctions, lastRefresh: rows[0]?.value || null };
+    const auctions = await this.prisma.auction.findMany({
+      orderBy: { added_at: 'desc' },
+      select: {
+        id: true, auction_number: true, short_description: true,
+        place_name: true, place_municipality: true, status: true,
+        status_translation: true, starting_price: true, start_date: true,
+        end_date: true, property_type: true, is_first_sale: true,
+        details_fetched: true, added_at: true,
+      },
+    });
+    const meta = await this.prisma.meta.findUnique({ where: { key: 'last_refresh' } });
+    return { auctions, lastRefresh: meta?.value || null };
   }
 
   async deleteAll(password: string) {
@@ -27,8 +28,8 @@ export class AuctionsService {
     if (!password || password !== required) {
       throw new ForbiddenException('Pogrešna lozinka');
     }
-    await this.db.query('DELETE FROM auctions');
-    await this.db.query('DELETE FROM meta WHERE key = $1', ['last_refresh']);
+    await this.prisma.auction.deleteMany();
+    await this.prisma.meta.deleteMany({ where: { key: 'last_refresh' } });
     return { ok: true };
   }
 }

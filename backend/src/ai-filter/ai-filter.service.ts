@@ -1,10 +1,10 @@
 import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AiFilterService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async filter(description: string, ids: string[]) {
     if (!description || !Array.isArray(ids) || ids.length === 0) {
@@ -15,13 +15,14 @@ export class AiFilterService {
       throw new InternalServerErrorException('GEMINI_API_KEY nije podešen na serveru.');
     }
 
-    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-    const { rows } = await this.db.query(
-      `SELECT id, short_description, place_name, place_municipality,
-              starting_price, property_type, is_first_sale
-       FROM auctions WHERE id IN (${placeholders})`,
-      ids,
-    );
+    const rows = await this.prisma.auction.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true, short_description: true, place_name: true,
+        place_municipality: true, starting_price: true,
+        property_type: true, is_first_sale: true,
+      },
+    });
 
     const auctions = rows.map(a => ({
       id:           a.id,

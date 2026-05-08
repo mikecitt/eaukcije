@@ -4,7 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AppController } from './app.controller';
-import { DatabaseModule } from './database/database.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { AuctionsModule } from './auctions/auctions.module';
 import { RefreshModule } from './refresh/refresh.module';
 import { AiFilterModule } from './ai-filter/ai-filter.module';
@@ -18,7 +18,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
       rootPath: join(__dirname, '..', '..', 'frontend'),
       exclude: ['/api/(.*)'],
     }),
-    DatabaseModule,
+    PrismaModule,
     AuctionsModule,
     RefreshModule,
     AiFilterModule,

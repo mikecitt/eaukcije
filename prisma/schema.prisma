@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Auction {
+  id                 String   @id
+  auction_number     String?
+  short_description  String?
+  place_name         String?
+  place_municipality String?
+  status             String?
+  status_translation String?
+  starting_price     Float?
+  start_date         String?
+  end_date           String?
+  property_type      String?
+  is_first_sale      Int      @default(0)
+  details_fetched    Int      @default(0)
+  raw_data           String?
+  added_at           DateTime @default(now()) @db.Timestamptz
+
+  @@map("auctions")
+}
+
+model Meta {
+  key   String  @id
+  value String?
+
+  @@map("meta")
+}
