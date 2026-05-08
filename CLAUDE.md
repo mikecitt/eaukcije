@@ -14,12 +14,12 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 
 | Layer | Technology |
 |---|---|
-| Backend | Node.js + Express 4 |
-| Database | PostgreSQL via `pg` (async Pool) |
-| Scheduler | `node-cron` — runs at 00:00 and 12:00 UTC daily |
+| Backend | Node.js + NestJS 10 (TypeScript) |
+| Database | PostgreSQL via `pg` (async Pool, raw queries) |
+| Scheduler | `@nestjs/schedule` (Cron) — runs at 00:00 and 12:00 UTC daily |
 | Frontend | Vanilla HTML/CSS/JS — single file, no build step |
 | AI filter | Google Generative AI SDK — `gemini-2.5-flash` |
-| Deployment | Docker + Docker Compose |
+| Deployment | Docker + Docker Compose (multi-stage build) |
 
 ---
 
@@ -28,22 +28,40 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 ```
 eaukcije/
 ├── backend/
-│   ├── server.js              # Express entry point, mounts all routes
-│   ├── db.js                  # PostgreSQL pool init & schema
-│   ├── scheduler.js           # node-cron jobs (00:00 & 12:00)
-│   ├── eaukcija-client.js     # HTTPS client for eaukcija.sud.rs API
-│   ├── utils.js               # Cyrillic-to-Latin helpers
-│   ├── routes/
-│   │   ├── auctions.js        # GET /api/auctions, DELETE /api/auctions
-│   │   ├── refresh.js         # POST /api/refresh (SSE streaming)
-│   │   └── ai-filter.js       # POST /api/ai-filter (Gemini 2.5 Flash)
-│   └── services/
-│       └── refresh.js         # Core refresh logic (fetch + enrich + upsert)
+│   ├── src/                        # NestJS TypeScript source
+│   │   ├── main.ts                 # Bootstrap (NestFactory, body-parser limit)
+│   │   ├── app.module.ts           # Root module — imports all feature modules
+│   │   ├── app.controller.ts       # GET /health
+│   │   ├── database/
+│   │   │   ├── database.module.ts
+│   │   │   └── database.service.ts # pg Pool init & schema (OnModuleInit)
+│   │   ├── eaukcija/
+│   │   │   ├── eaukcija.module.ts
+│   │   │   └── eaukcija.service.ts # HTTPS client for eaukcija.sud.rs API
+│   │   ├── auctions/
+│   │   │   ├── auctions.module.ts
+│   │   │   ├── auctions.controller.ts
+│   │   │   └── auctions.service.ts
+│   │   ├── refresh/
+│   │   │   ├── refresh.module.ts
+│   │   │   ├── refresh.controller.ts  # POST /api/refresh (SSE streaming)
+│   │   │   └── refresh.service.ts     # Core refresh logic (fetch + enrich + upsert)
+│   │   ├── ai-filter/
+│   │   │   ├── ai-filter.module.ts
+│   │   │   ├── ai-filter.controller.ts
+│   │   │   └── ai-filter.service.ts
+│   │   ├── scheduler/
+│   │   │   ├── scheduler.module.ts
+│   │   │   └── scheduler.service.ts   # @Cron jobs at 00:00 & 12:00
+│   │   └── utils/
+│   │       └── utils.ts               # Cyrillic-to-Latin helpers
+│   └── dist/                       # Compiled JS output (gitignored)
 ├── frontend/
-│   └── index.html             # Entire UI (~1200 lines, vanilla JS)
+│   └── index.html                  # Entire UI (~1200 lines, vanilla JS)
 ├── package.json
+├── tsconfig.json
 ├── docker-compose.yml
-├── Dockerfile
+├── Dockerfile                      # Multi-stage: build (tsc) → production image
 └── .env.example
 ```
 
@@ -79,7 +97,7 @@ Request body:
 ```json
 {
   "description": "kuća u Vojvodini ispod 5 miliona",
-  "auctions": [ /* array of auction objects from allAuctions */ ]
+  "ids": ["abc123", "def456"]
 }
 ```
 
@@ -150,10 +168,10 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 
 ```bash
 cp .env.example .env
-# Edit .env — set DB_REMOVE_PASSWORD, ANTHROPIC_API_KEY, DATABASE_URL
+# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, DATABASE_URL
 
 npm install
-npm run dev        # node --watch backend/server.js
+npm run dev        # ts-node backend/src/main.ts
 # open http://localhost:3000
 ```
 
@@ -163,11 +181,18 @@ A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configur
 
 ```bash
 cp .env.example .env
-# Edit .env — set DB_REMOVE_PASSWORD, ANTHROPIC_API_KEY, POSTGRES_PASSWORD
+# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, POSTGRES_PASSWORD
 
 docker compose up --build
 # open http://localhost:3000
 # PostgreSQL data persists in the 'pgdata' Docker volume
+```
+
+## Building for production
+
+```bash
+npm run build      # tsc → backend/dist/
+node backend/dist/main.js
 ```
 
 ---
@@ -177,4 +202,4 @@ docker compose up --build
 - **Host:** `eaukcija.sud.rs`
 - **Endpoint used:** `POST /WebApi.Proxy/api/EAukcija/GetAuctionsByCategoryId` (category `7`, pageSize 500)
 - **Detail endpoint:** `POST /WebApi.Proxy/api/EAukcija/GetImmovablePropertyDetails`
-- Client is in `backend/eaukcija-client.js`; no auth required.
+- Client is in `backend/src/eaukcija/eaukcija.service.ts`; no auth required.

@@ -1,14 +1,16 @@
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json tsconfig.json ./
+RUN npm ci
+COPY backend/src/ ./backend/src/
+RUN npm run build
+
 FROM node:22-alpine
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm ci --only=production
-
-# backend rarely changes; frontend changes most often — order optimises layer cache
-COPY backend/  ./backend/
+RUN npm ci --omit=dev
+COPY --from=builder /app/backend/dist ./backend/dist
 COPY frontend/ ./frontend/
-
 ENV PORT=3000
 EXPOSE 3000
-
-CMD ["node", "backend/server.js"]
+CMD ["node", "backend/dist/main.js"]
