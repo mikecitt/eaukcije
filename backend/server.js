@@ -11,6 +11,8 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auctions', require('./routes/auctions'));
 app.use('/api/refresh',  require('./routes/refresh'));
 
+require('./scheduler');
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\n  EAukcije: http://localhost:${PORT}\n`);
