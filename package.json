@@ -1,8 +1,14 @@
 {
-  "name": "eaukcije-client",
-  "version": "0.2.0",
-  "description": "Serbian court auction browser — pure client-side app",
+  "name": "eaukcije",
+  "version": "1.0.0",
+  "description": "Serbian court auctions tracker with persistent database",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "node proxy.js"
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "express": "^4.18.2"
   }
 }
