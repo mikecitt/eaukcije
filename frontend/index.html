@@ -371,6 +371,57 @@
     .pbtn.active { background: var(--primary); border-color: var(--primary); color: white; font-weight: 600; }
     .pbtn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+    /* ── Checkbox filter ── */
+    .check-filter {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+      user-select: none;
+    }
+    .check-filter input[type=checkbox] {
+      width: 15px; height: 15px;
+      accent-color: var(--primary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .check-filter:hover { color: var(--text); }
+
+    /* ── Modal ── */
+    dialog {
+      border: none;
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+      max-width: 380px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.45); }
+    .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .modal-desc  { font-size: 0.85rem; color: var(--muted); margin-bottom: 16px; }
+    .modal-input {
+      width: 100%;
+      height: 36px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      margin-bottom: 8px;
+      transition: border-color 0.15s;
+    }
+    .modal-input:focus { border-color: var(--primary); }
+    .modal-input.error { border-color: var(--danger); }
+    .modal-err { font-size: 0.8rem; color: var(--danger); margin-bottom: 14px; min-height: 1.1em; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-modal-cancel  { background: var(--light); color: var(--muted); border: 1px solid var(--border); }
+    .btn-modal-cancel:hover  { background: var(--border); color: var(--text); }
+    .btn-modal-confirm { background: var(--danger); color: white; }
+    .btn-modal-confirm:hover { background: #b91c1c; }
+
     /* ── Empty state ── */
     .empty {
       text-align: center;
@@ -484,6 +535,13 @@
     </div>
     <div class="fg" style="justify-content:flex-end;">
       <label>&nbsp;</label>
+      <label class="check-filter">
+        <input type="checkbox" id="fShowFinished">
+        Prikaži završene
+      </label>
+    </div>
+    <div class="fg" style="justify-content:flex-end;">
+      <label>&nbsp;</label>
       <button class="btn btn-outline" id="resetBtn" style="height:32px;padding:0 12px;font-size:0.8rem;">
         Resetuj filtere
       </button>
@@ -518,13 +576,12 @@
             <th class="sortable" data-col="starting_price">Poc. cena <i class="sort-arrow">↕</i></th>
             <th class="sortable" data-col="start_date">Pocetak <i class="sort-arrow">↕</i></th>
             <th class="sortable" data-col="end_date">Kraj <i class="sort-arrow">↕</i></th>
-            <th class="sortable" data-col="property_type">Tip <i class="sort-arrow">↕</i></th>
             <th class="sortable" data-col="is_first_sale">1. Prod. <i class="sort-arrow">↕</i></th>
             <th class="sortable" data-col="added_at">Dodata <i class="sort-arrow">↕</i></th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="11">
+          <tr><td colspan="10">
             <div class="empty">
               <h3>Nema podataka</h3>
               <p>Kliknite "Osveži" da preuzmete aukcije iz baze</p>
@@ -538,6 +595,18 @@
   </div>
 </div>
 
+<!-- Delete confirmation modal -->
+<dialog id="deleteModal">
+  <div class="modal-title">Potvrdi brisanje baze</div>
+  <div class="modal-desc">Unesite lozinku da biste obrisali sve aukcije. Ova akcija se ne može poništiti.</div>
+  <input class="modal-input" type="password" id="deletePassword" placeholder="Lozinka" autocomplete="off">
+  <div class="modal-err" id="deleteErr"></div>
+  <div class="modal-actions">
+    <button class="btn btn-modal-cancel" id="deleteCancelBtn">Odustani</button>
+    <button class="btn btn-modal-confirm" id="deleteConfirmBtn">Obriši</button>
+  </div>
+</dialog>
+
 <script>
   // ── State ──────────────────────────────────────────────────────────────────
   let allAuctions      = [];
@@ -550,22 +619,40 @@
 
   // ── DOM ────────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
-  const refreshBtn      = $('refreshBtn');
-  const clearBtn        = $('clearBtn');
-  const tableBody       = $('tableBody');
-  const msgBox          = $('msgBox');
-  const progressBar     = $('progressBar');
-  const progressText    = $('progressText');
-  const progressFill    = $('progressFill');
+  const refreshBtn       = $('refreshBtn');
+  const clearBtn         = $('clearBtn');
+  const tableBody        = $('tableBody');
+  const msgBox           = $('msgBox');
+  const progressBar      = $('progressBar');
+  const progressText     = $('progressText');
+  const progressFill     = $('progressFill');
   const lastRefreshLabel = $('lastRefreshLabel');
-  const fSearch         = $('fSearch');
-  const fStatus         = $('fStatus');
-  const fFirstSale      = $('fFirstSale');
-  const fPriceMin       = $('fPriceMin');
-  const fPriceMax       = $('fPriceMax');
-  const perPageSel      = $('perPage');
-  const paginationEl    = $('paginationEl');
-  const tableCountLabel = $('tableCountLabel');
+  const fSearch          = $('fSearch');
+  const fStatus          = $('fStatus');
+  const fFirstSale       = $('fFirstSale');
+  const fPriceMin        = $('fPriceMin');
+  const fPriceMax        = $('fPriceMax');
+  const fShowFinished    = $('fShowFinished');
+  const perPageSel       = $('perPage');
+  const paginationEl     = $('paginationEl');
+  const tableCountLabel  = $('tableCountLabel');
+  const deleteModal      = $('deleteModal');
+  const deletePassword   = $('deletePassword');
+  const deleteErr        = $('deleteErr');
+
+  // ── Latin → Cyrillic transliteration (Serbian) ────────────────────────────
+  const latinToCyrillic = str => {
+    const digraphs = [['lj','љ'],['nj','њ'],['dž','џ'],['dj','ђ']];
+    const map = {
+      'a':'а','b':'б','c':'ц','č':'ч','ć':'ћ','d':'д','đ':'ђ',
+      'e':'е','f':'ф','g':'г','h':'х','i':'и','j':'ј','k':'к',
+      'l':'л','m':'м','n':'н','o':'о','p':'п','r':'р','s':'с',
+      'š':'ш','t':'т','u':'у','v':'в','z':'з','ž':'ж'
+    };
+    let s = str;
+    for (const [lat, cyr] of digraphs) s = s.split(lat).join(cyr);
+    return [...s].map(ch => map[ch] ?? ch).join('');
+  };
 
   // ── Formatting ─────────────────────────────────────────────────────────────
   const fmtDate = str => {
@@ -626,17 +713,21 @@
 
   // ── Filtering ──────────────────────────────────────────────────────────────
   const applyFilters = data => {
-    const search    = fSearch.value.trim().toLowerCase();
-    const status    = fStatus.value;
-    const firstSale = fFirstSale.value;
-    const priceMin  = fPriceMin.value !== '' ? Number(fPriceMin.value) : null;
-    const priceMax  = fPriceMax.value !== '' ? Number(fPriceMax.value) : null;
+    const rawSearch  = fSearch.value.trim().toLowerCase();
+    const cyrSearch  = rawSearch ? latinToCyrillic(rawSearch) : '';
+    const status     = fStatus.value;
+    const firstSale  = fFirstSale.value;
+    const priceMin   = fPriceMin.value !== '' ? Number(fPriceMin.value) : null;
+    const priceMax   = fPriceMax.value !== '' ? Number(fPriceMax.value) : null;
+    const showFinished = fShowFinished.checked;
+    const now        = new Date();
 
     return data.filter(a => {
-      if (search) {
+      if (!showFinished && a.end_date && new Date(a.end_date) < now) return false;
+      if (cyrSearch) {
         const hay = [a.auction_number, a.short_description, a.place_name, a.place_municipality]
           .join(' ').toLowerCase();
-        if (!hay.includes(search)) return false;
+        if (!hay.includes(cyrSearch) && !hay.includes(rawSearch)) return false;
       }
       if (status && a.status_translation !== status && a.status !== status) return false;
       if (firstSale !== '' && String(a.is_first_sale) !== firstSale) return false;
@@ -677,7 +768,7 @@
       `Prikazano ${filteredAuctions.length.toLocaleString('sr-RS')} od ${allAuctions.length.toLocaleString('sr-RS')} aukcija`;
 
     if (filteredAuctions.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="11"><div class="empty">
+      tableBody.innerHTML = `<tr><td colspan="10"><div class="empty">
         <h3>Nema rezultata</h3>
         <p>${allAuctions.length > 0 ? 'Nema aukcija koje odgovaraju filterima' : 'Kliknite "Osveži" da preuzmete aukcije'}</p>
       </div></td></tr>`;
@@ -700,7 +791,6 @@
         <td class="col-price">${fmtPrice(a.starting_price)}</td>
         <td class="col-date">${fmtDate(a.start_date)}</td>
         <td class="col-date">${fmtDate(a.end_date)}</td>
-        <td>${esc(a.property_type || '—')}</td>
         <td class="${a.is_first_sale ? 'first-yes' : 'first-no'}">${a.is_first_sale ? 'Da' : 'Ne'}</td>
         <td class="col-added">${fmtDateTime(a.added_at)}</td>
       </tr>`;
@@ -844,19 +934,45 @@
     }
   };
 
-  // ── Clear DB ───────────────────────────────────────────────────────────────
-  const doClear = async () => {
-    if (!confirm('Obrisati sve aukcije iz baze?\n\nOva akcija se ne može poništiti.')) return;
+  // ── Clear DB (password modal) ──────────────────────────────────────────────
+  const doClear = () => {
+    deletePassword.value = '';
+    deletePassword.classList.remove('error');
+    deleteErr.textContent = '';
+    deleteModal.showModal();
+    setTimeout(() => deletePassword.focus(), 50);
+  };
+
+  const submitDelete = async () => {
+    const pwd = deletePassword.value;
+    if (!pwd) {
+      deletePassword.classList.add('error');
+      deleteErr.textContent = 'Unesite lozinku.';
+      return;
+    }
+    $('deleteConfirmBtn').disabled = true;
     try {
-      const res = await fetch('/api/auctions', { method: 'DELETE' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch('/api/auctions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        deletePassword.classList.add('error');
+        deleteErr.textContent = data.error || `Greška (${res.status})`;
+        return;
+      }
+      deleteModal.close();
       allAuctions = []; filteredAuctions = [];
       populateStatusFilter([]);
       applyAndRender();
       setLastRefresh(null);
       showMsg('info', 'Baza je obrisana.');
     } catch (err) {
-      showMsg('error', `Greška: ${err.message}`);
+      deleteErr.textContent = `Greška: ${err.message}`;
+    } finally {
+      $('deleteConfirmBtn').disabled = false;
     }
   };
 
@@ -873,9 +989,18 @@
   refreshBtn.addEventListener('click', doRefresh);
   clearBtn.addEventListener('click', doClear);
 
+  $('deleteCancelBtn').addEventListener('click', () => deleteModal.close());
+  $('deleteConfirmBtn').addEventListener('click', submitDelete);
+  deletePassword.addEventListener('keydown', e => { if (e.key === 'Enter') submitDelete(); });
+  deletePassword.addEventListener('input', () => {
+    deletePassword.classList.remove('error');
+    deleteErr.textContent = '';
+  });
+
   $('resetBtn').addEventListener('click', () => {
     fSearch.value = ''; fStatus.value = ''; fFirstSale.value = '';
     fPriceMin.value = ''; fPriceMax.value = '';
+    fShowFinished.checked = false;
     applyAndRender();
   });
 
@@ -884,6 +1009,7 @@
   fFirstSale.addEventListener('change', applyAndRender);
   fPriceMin.addEventListener('input', applyAndRender);
   fPriceMax.addEventListener('input', applyAndRender);
+  fShowFinished.addEventListener('change', applyAndRender);
 
   perPageSel.addEventListener('change', () => {
     perPage = +perPageSel.value;
