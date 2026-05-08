@@ -15,24 +15,36 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: 'GEMINI_API_KEY nije podešen na serveru.' });
   }
 
-  const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-  const { rows } = await pool.query(
-    `SELECT id, short_description, place_name, place_municipality,
-            starting_price, property_type, is_first_sale
-     FROM auctions WHERE id IN (${placeholders})`,
-    ids
-  );
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.flushHeaders();
 
-  const auctions = rows.map(a => ({
-    id:           a.id,
-    opis:         (a.short_description || '').slice(0, 120),
-    mesto:        [a.place_name, a.place_municipality].filter(Boolean).join(', '),
-    cena_rsd:     a.starting_price || 0,
-    tip:          a.property_type  || '',
-    prva_prodaja: a.is_first_sale  ? 'da' : 'ne',
-  }));
+  const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-  const prompt = `Ti si asistent koji filtrira liste aukcija nepokretnosti. \
+  try {
+    send({ type: 'status', message: `Učitavanje ${ids.length} aukcija iz baze…` });
+
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    const { rows } = await pool.query(
+      `SELECT id, short_description, place_name, place_municipality,
+              starting_price, property_type, is_first_sale
+       FROM auctions WHERE id IN (${placeholders})`,
+      ids
+    );
+
+    send({ type: 'status', message: `Slanje tražnje AI serveru (${rows.length} aukcija)…` });
+
+    const auctions = rows.map(a => ({
+      id:           a.id,
+      opis:         (a.short_description || '').slice(0, 120),
+      mesto:        [a.place_name, a.place_municipality].filter(Boolean).join(', '),
+      cena_rsd:     a.starting_price || 0,
+      tip:          a.property_type  || '',
+      prva_prodaja: a.is_first_sale  ? 'da' : 'ne',
+    }));
+
+    const prompt = `Ti si asistent koji filtrira liste aukcija nepokretnosti. \
 Korisnik želi aukcije koje odgovaraju sledećem kriterijumu:
 
 "${description}"
@@ -44,25 +56,28 @@ Vrati SAMO JSON objekat sa poljem "matchingIds" koje sadrži niz ID-eva aukcija 
 odgovaraju kriterijumu. Ako ništa ne odgovara, vrati prazan niz. \
 Nemoj pisati ništa osim JSON-a.`;
 
-  try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     const text   = result.response.text().trim();
 
+    send({ type: 'status', message: 'Analiza rezultata…' });
+
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return res.status(500).json({ error: 'Neispravan odgovor AI agenta.' });
+    if (!jsonMatch) throw new Error('Neispravan odgovor AI agenta.');
 
     const parsed = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(parsed.matchingIds)) {
-      return res.status(500).json({ error: 'Neispravan format odgovora AI agenta.' });
+      throw new Error('Neispravan format odgovora AI agenta.');
     }
 
-    res.json({ matchingIds: parsed.matchingIds });
+    send({ type: 'done', matchingIds: parsed.matchingIds });
   } catch (err) {
     console.error('AI filter error:', err.message);
-    res.status(500).json({ error: err.message });
+    send({ type: 'error', message: err.message });
   }
+
+  res.end();
 });
 
 module.exports = router;

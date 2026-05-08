@@ -1035,8 +1035,6 @@
     if (!query) { fAiQuery.focus(); return; }
     if (aiBusy) return;
 
-    // Run AI filter against the currently basic-filtered auctions
-    // (without the AI filter itself applied) so the user can iterate
     const baseFiltered = applyFilters(allAuctions);
     if (baseFiltered.length === 0) {
       setAiStatus('error', 'Nema aukcija za filtriranje.');
@@ -1045,7 +1043,7 @@
 
     aiBusy = true;
     aiFilterBtn.disabled = true;
-    setAiStatus('', `<div class="spinner" style="border-top-color:#7c3aed;"></div> AI analizira ${baseFiltered.length} aukcija…`);
+    setAiStatus('', `<div class="spinner" style="border-top-color:#7c3aed;"></div> Učitavanje…`);
 
     try {
       const res = await fetch('/api/ai-filter', {
@@ -1053,23 +1051,51 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: query, ids: baseFiltered.map(a => a.id) }),
       });
-      let data;
-      try { data = await res.json(); } catch (_) { throw new Error(`HTTP ${res.status}`); }
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      aiMatchIds = new Set(data.matchingIds);
-      const count = aiMatchIds.size;
-      setAiStatus('active',
-        `✦ AI pronašao <strong>${count}</strong> aukcija koje odgovaraju &mdash; ` +
-        `<button class="btn-ai-clear" id="aiClearBtn">Ukloni AI filter</button>`
-      );
-      $('aiClearBtn').addEventListener('click', clearAiFilter);
-      applyAndRender();
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const part of parts) {
+          const line = part.trim();
+          if (line.startsWith('data: ')) {
+            try { handleAiEvent(JSON.parse(line.slice(6))); } catch (_) {}
+          }
+        }
+      }
     } catch (err) {
       setAiStatus('error', `Greška: ${esc(err.message)}`);
     } finally {
       aiBusy = false;
       aiFilterBtn.disabled = false;
+    }
+  };
+
+  const handleAiEvent = ev => {
+    switch (ev.type) {
+      case 'status':
+        setAiStatus('', `<div class="spinner" style="border-top-color:#7c3aed;"></div> ${esc(ev.message)}`);
+        break;
+      case 'done':
+        aiMatchIds = new Set(ev.matchingIds);
+        const count = aiMatchIds.size;
+        setAiStatus('active',
+          `✦ AI pronašao <strong>${count}</strong> aukcija koje odgovaraju &mdash; ` +
+          `<button class="btn-ai-clear" id="aiClearBtn">Ukloni AI filter</button>`
+        );
+        $('aiClearBtn').addEventListener('click', clearAiFilter);
+        applyAndRender();
+        break;
+      case 'error':
+        setAiStatus('error', `Greška: ${esc(ev.message)}`);
+        break;
     }
   };
 
