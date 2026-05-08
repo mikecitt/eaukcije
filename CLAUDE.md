@@ -18,7 +18,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 | Database | PostgreSQL via `pg` (async Pool) |
 | Scheduler | `node-cron` — runs at 00:00 and 12:00 UTC daily |
 | Frontend | Vanilla HTML/CSS/JS — single file, no build step |
-| AI filter | Anthropic SDK — `claude-haiku-4-5-20251001` |
+| AI filter | Google Generative AI SDK — `gemini-2.0-flash` |
 | Deployment | Docker + Docker Compose |
 
 ---
@@ -57,7 +57,7 @@ All variables live in `.env` (copy from `.env.example`):
 |---|---|---|
 | `PORT` | No | HTTP port, default `3000` |
 | `DB_REMOVE_PASSWORD` | Yes | Password for `DELETE /api/auctions` |
-| `ANTHROPIC_API_KEY` | Yes (for AI filter) | Anthropic API key — used by `POST /api/ai-filter` |
+| `GEMINI_API_KEY` | Yes (for AI filter) | Google Gemini API key — used by `POST /api/ai-filter` |
 | `DATABASE_URL` | Yes | PostgreSQL connection string, e.g. `postgres://user:pass@host:5432/db` |
 | `POSTGRES_PASSWORD` | Docker only | Password injected into the `postgres` service in Docker Compose |
 
@@ -88,7 +88,7 @@ Response:
 { "matchingIds": ["abc123", "def456"] }
 ```
 
-Uses `claude-haiku-4-5-20251001`. Each auction is trimmed to key fields (id, opis, mesto, cena_rsd, tip, prva_prodaja) before sending to keep token usage low.
+Uses `gemini-2.0-flash`. Frontend sends only auction IDs; backend fetches key fields from PostgreSQL (id, opis, mesto, cena_rsd, tip, prva_prodaja) before sending to keep token usage low.
 
 ---
 
