@@ -1,6 +1,5 @@
 const db = require('../db');
 const { fetchAllAuctions, fetchAuctionDetails } = require('../eaukcija-client');
-const { cyrToLat } = require('../utils');
 
 // onProgress(msg, pct) — optional callback for streaming progress
 async function runRefresh(onProgress = () => {}) {
@@ -26,7 +25,7 @@ async function runRefresh(onProgress = () => {}) {
   db.transaction(list => {
     for (const a of list) {
       updateStmt.run(
-        cyrToLat(a.Status || ''), cyrToLat(a.StatusTranslation || ''),
+        a.Status || '', a.StatusTranslation || '',
         a.StartingPrice, a.StartDate, a.EndDate,
         String(a.Id)
       );
@@ -58,16 +57,16 @@ async function runRefresh(onProgress = () => {}) {
 
     insertStmt.run(
       id,
-      cyrToLat(a.AuctionNumber       || ''),
-      cyrToLat(a.ShortDescription    || ''),
-      cyrToLat(details?.Place?.Name         || ''),
-      cyrToLat(details?.Place?.Municipality || ''),
-      cyrToLat(a.Status              || ''),
-      cyrToLat(a.StatusTranslation   || ''),
-      a.StartingPrice      || 0,
-      a.StartDate          || '',
-      a.EndDate            || '',
-      cyrToLat(a.PropertyType        || ''),
+      a.AuctionNumber        || '',
+      a.ShortDescription     || '',
+      details?.Place?.Name         || '',
+      details?.Place?.Municipality || '',
+      a.Status               || '',
+      a.StatusTranslation    || '',
+      a.StartingPrice        || 0,
+      a.StartDate            || '',
+      a.EndDate              || '',
+      a.PropertyType         || '',
       a.IsFirstSale ? 1 : 0,
       details ? 1 : 0,
       JSON.stringify({ auction: a, details }),
