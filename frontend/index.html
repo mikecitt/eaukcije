@@ -571,12 +571,118 @@
 
     /* ── Responsive ── */
     @media (max-width: 700px) {
-      .header { padding: 12px 14px; }
-      .header-title h1 { font-size: 1.1rem; }
+      /* Header */
+      .header { flex-direction: column; align-items: flex-start; padding: 10px 14px; gap: 6px; }
+      .header-title h1 { font-size: 1.05rem; }
+      .header-title p { display: none; }
+      .header-actions { width: 100%; gap: 8px; }
+      .last-refresh-label { width: 100%; order: 3; font-size: 0.7rem; opacity: 0.55; }
+
+      /* Main */
       .main { padding: 10px; }
-      .stats-row { grid-template-columns: repeat(2, 1fr); }
-      table { font-size: 0.8rem; }
-      th, td { padding: 7px 8px; }
+
+      /* Stats */
+      .stats-row { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
+      .stat-card { padding: 10px 12px; }
+      .stat-card .value { font-size: 1.25rem; }
+
+      /* Filters panel — 2-column grid */
+      .filters-panel {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      .fg.fg-search { grid-column: span 2; }
+      .fg { min-width: 0; }
+      .fg-price input { width: 100%; }
+      .fg input, .fg select { height: 40px; font-size: 0.9rem; width: 100%; }
+      .fg label { font-size: 0.68rem; }
+      .check-filter { height: 40px; }
+
+      /* AI filter — stack input + button */
+      .ai-filter-panel { padding: 10px; margin-bottom: 10px; }
+      .ai-filter-row { flex-direction: column; gap: 8px; }
+      .btn-ai { width: 100%; justify-content: center; height: 40px; }
+      #fAiQuery { height: 40px; }
+
+      /* Table → Card layout */
+      .table-wrapper { overflow-x: visible; }
+      table { display: block; }
+      thead { display: none; }
+      tbody { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+
+      tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "auction  status"
+          "desc     desc"
+          "place    place"
+          "price    firstsale"
+          "start    end"
+          "added    added";
+        column-gap: 12px;
+        row-gap: 8px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      }
+
+      tbody tr:hover { background: #f8fafc; }
+      tbody tr:last-child td { border-bottom: none; }
+
+      td {
+        display: block;
+        padding: 0;
+        border: none;
+        font-size: 0.85rem;
+        vertical-align: top;
+      }
+
+      td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--muted);
+        margin-bottom: 3px;
+      }
+
+      td.col-num { display: none; }
+      td.col-auction { grid-area: auction; }
+      td.col-desc { grid-area: desc; font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+      td.col-place { grid-area: place; }
+      td.col-status { grid-area: status; text-align: right; }
+      td.col-status::before { text-align: right; }
+      td.col-price { grid-area: price; text-align: left; font-size: 0.95rem; }
+      td.col-start { grid-area: start; }
+      td.col-end { grid-area: end; text-align: right; }
+      td.col-end::before { text-align: right; }
+      td.col-firstsale { grid-area: firstsale; text-align: right; }
+      td.col-firstsale::before { text-align: right; }
+      td.col-added { grid-area: added; }
+
+      /* Empty state — undo the grid so the single cell displays normally */
+      tbody tr:has(td[colspan]) {
+        display: block;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+      }
+      tbody tr:has(td[colspan]) td { display: block; }
+      tbody tr:has(td[colspan]) td::before { display: none; }
+
+      /* Table meta + pagination */
+      .table-meta { flex-direction: column; align-items: flex-start; padding: 10px 12px; }
+      .pagination { padding: 10px 12px; }
+      .pbtn { padding: 5px 10px; text-align: center; }
     }
   </style>
 </head>
@@ -953,19 +1059,19 @@
       const desc     = a.short_description || '';
       const descShow = desc.length > 70 ? desc.slice(0, 70) + '…' : desc;
       return `<tr>
-        <td class="col-num">${start + i + 1}</td>
-        <td><a class="auction-link" href="https://eaukcija.sud.rs/#/aukcije/${esc(a.id)}" target="_blank" rel="noopener">${esc(a.auction_number || a.id)}</a></td>
-        <td title="${esc(desc)}">${esc(descShow)}</td>
-        <td>
+        <td class="col-num" data-label="#">${start + i + 1}</td>
+        <td class="col-auction" data-label="Aukcija"><a class="auction-link" href="https://eaukcija.sud.rs/#/aukcije/${esc(a.id)}" target="_blank" rel="noopener">${esc(a.auction_number || a.id)}</a></td>
+        <td class="col-desc" data-label="Opis" title="${esc(desc)}">${esc(descShow)}</td>
+        <td class="col-place" data-label="Mesto">
           <span class="place-name">${esc(a.place_name || '—')}</span>
           ${a.place_municipality ? `<span class="place-muni">${esc(a.place_municipality)}</span>` : ''}
         </td>
-        <td>${statusBadge(a.status, a.status_translation)}</td>
-        <td class="col-price">${fmtPrice(a.starting_price)}</td>
-        <td class="col-date">${fmtDate(a.start_date)}</td>
-        <td class="col-date">${fmtDate(a.end_date)}</td>
-        <td class="${a.is_first_sale ? 'first-yes' : 'first-no'}">${a.is_first_sale ? 'Da' : 'Ne'}</td>
-        <td class="col-added">${fmtDateTime(a.added_at)}</td>
+        <td class="col-status" data-label="Status">${statusBadge(a.status, a.status_translation)}</td>
+        <td class="col-price" data-label="Cena">${fmtPrice(a.starting_price)}</td>
+        <td class="col-date col-start" data-label="Početak">${fmtDate(a.start_date)}</td>
+        <td class="col-date col-end" data-label="Kraj">${fmtDate(a.end_date)}</td>
+        <td class="col-firstsale ${a.is_first_sale ? 'first-yes' : 'first-no'}" data-label="1. Prod.">${a.is_first_sale ? 'Da' : 'Ne'}</td>
+        <td class="col-added" data-label="Dodata">${fmtDateTime(a.added_at)}</td>
       </tr>`;
     }).join('');
 
