@@ -1,8 +1,31 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eaukcije
+      POSTGRES_USER: eaukcije
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eaukcije"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     ports:
       - "3000:3000"
-    volumes:
-      - ./data:/app/data
+    environment:
+      DATABASE_URL: postgres://eaukcije:${POSTGRES_PASSWORD:-changeme}@postgres:5432/eaukcije
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata:

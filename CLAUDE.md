@@ -6,7 +6,7 @@
 
 ## What this project is
 
-A full-stack web app that tracks Serbian court auctions of real estate from `eaukcija.sud.rs` (category 7 — immovable properties). It scrapes auction data on a schedule, persists it to SQLite, and exposes a browser UI with filtering, sorting, pagination, and an AI-powered natural language filter.
+A full-stack web app that tracks Serbian court auctions of real estate from `eaukcija.sud.rs` (category 7 — immovable properties). It scrapes auction data on a schedule, persists it to PostgreSQL, and exposes a browser UI with filtering, sorting, pagination, and an AI-powered natural language filter.
 
 ---
 
@@ -15,7 +15,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 | Layer | Technology |
 |---|---|
 | Backend | Node.js + Express 4 |
-| Database | SQLite via `better-sqlite3` (synchronous) |
+| Database | PostgreSQL via `pg` (async Pool) |
 | Scheduler | `node-cron` — runs at 00:00 and 12:00 UTC daily |
 | Frontend | Vanilla HTML/CSS/JS — single file, no build step |
 | AI filter | Anthropic SDK — `claude-haiku-4-5-20251001` |
@@ -29,7 +29,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 eaukcije/
 ├── backend/
 │   ├── server.js              # Express entry point, mounts all routes
-│   ├── db.js                  # SQLite init & schema
+│   ├── db.js                  # PostgreSQL pool init & schema
 │   ├── scheduler.js           # node-cron jobs (00:00 & 12:00)
 │   ├── eaukcija-client.js     # HTTPS client for eaukcija.sud.rs API
 │   ├── utils.js               # Cyrillic-to-Latin helpers
@@ -41,8 +41,6 @@ eaukcije/
 │       └── refresh.js         # Core refresh logic (fetch + enrich + upsert)
 ├── frontend/
 │   └── index.html             # Entire UI (~1200 lines, vanilla JS)
-├── data/
-│   └── aukcije.db             # SQLite database (auto-created, gitignored)
 ├── package.json
 ├── docker-compose.yml
 ├── Dockerfile
@@ -60,6 +58,8 @@ All variables live in `.env` (copy from `.env.example`):
 | `PORT` | No | HTTP port, default `3000` |
 | `DB_REMOVE_PASSWORD` | Yes | Password for `DELETE /api/auctions` |
 | `ANTHROPIC_API_KEY` | Yes (for AI filter) | Anthropic API key — used by `POST /api/ai-filter` |
+| `DATABASE_URL` | Yes | PostgreSQL connection string, e.g. `postgres://user:pass@host:5432/db` |
+| `POSTGRES_PASSWORD` | Docker only | Password injected into the `postgres` service in Docker Compose |
 
 ---
 
@@ -112,7 +112,7 @@ Uses `claude-haiku-4-5-20251001`. Each auction is trimmed to key fields (id, opi
 | `is_first_sale` | INTEGER | 0 or 1 |
 | `details_fetched` | INTEGER | 0 or 1 — whether detail API was called |
 | `raw_data` | TEXT | Full JSON blob; excluded from `/api/auctions` response |
-| `added_at` | TEXT | `datetime('now')` at insert |
+| `added_at` | TIMESTAMPTZ | `NOW()` at insert |
 
 **`meta`** — key/value store; currently only `last_refresh` (ISO 8601 string).
 
@@ -150,22 +150,24 @@ Uses `claude-haiku-4-5-20251001`. Each auction is trimmed to key fields (id, opi
 
 ```bash
 cp .env.example .env
-# Edit .env — set DB_REMOVE_PASSWORD and ANTHROPIC_API_KEY
+# Edit .env — set DB_REMOVE_PASSWORD, ANTHROPIC_API_KEY, DATABASE_URL
 
 npm install
 npm run dev        # node --watch backend/server.js
 # open http://localhost:3000
 ```
 
+A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configure.
+
 ## Running with Docker
 
 ```bash
 cp .env.example .env
-# Edit .env
+# Edit .env — set DB_REMOVE_PASSWORD, ANTHROPIC_API_KEY, POSTGRES_PASSWORD
 
 docker compose up --build
 # open http://localhost:3000
-# SQLite database persists in ./data/aukcije.db via volume mount
+# PostgreSQL data persists in the 'pgdata' Docker volume
 ```
 
 ---
