@@ -40,9 +40,9 @@ describe('POST /api/ai-filter', () => {
     assert.ok(res.body.error);
   });
 
-  test('returns 500 when ANTHROPIC_API_KEY is not set', { skip: !dbAvailable && 'PostgreSQL not available' }, async () => {
-    const saved = process.env.ANTHROPIC_API_KEY;
-    delete process.env.ANTHROPIC_API_KEY;
+  test('returns 500 when GEMINI_API_KEY is not set', { skip: !dbAvailable && 'PostgreSQL not available' }, async () => {
+    const saved = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     try {
       const res = await request(app)
         .post('/api/ai-filter')
@@ -50,7 +50,7 @@ describe('POST /api/ai-filter', () => {
       assert.equal(res.status, 500);
       assert.ok(res.body.error);
     } finally {
-      if (saved !== undefined) process.env.ANTHROPIC_API_KEY = saved;
+      if (saved !== undefined) process.env.GEMINI_API_KEY = saved;
     }
   });
 });
