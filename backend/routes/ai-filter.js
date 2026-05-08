@@ -1,6 +1,6 @@
 const express   = require('express');
 const Anthropic  = require('@anthropic-ai/sdk');
-const db         = require('../db');
+const { pool }   = require('../db');
 
 const router = express.Router();
 
@@ -15,14 +15,15 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY nije podešen na serveru.' });
   }
 
-  const placeholders = ids.map(() => '?').join(',');
-  const rows = db.prepare(`
-    SELECT id, short_description, place_name, place_municipality,
-           starting_price, property_type, is_first_sale
-    FROM auctions WHERE id IN (${placeholders})
-  `).all(...ids);
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+  const { rows } = await pool.query(
+    `SELECT id, short_description, place_name, place_municipality,
+            starting_price, property_type, is_first_sale
+     FROM auctions WHERE id IN (${placeholders})`,
+    ids
+  );
 
-  const auctionList = rows.map(a => ({
+  const auctions = rows.map(a => ({
     id:           a.id,
     opis:         (a.short_description || '').slice(0, 120),
     mesto:        [a.place_name, a.place_municipality].filter(Boolean).join(', '),
@@ -39,7 +40,7 @@ Korisnik želi aukcije koje odgovaraju sledećem kriterijumu:
 "${description}"
 
 Lista aukcija (JSON):
-${JSON.stringify(auctionList)}
+${JSON.stringify(auctions)}
 
 Vrati SAMO JSON objekat sa poljem "matchingIds" koje sadrži niz ID-eva aukcija koje \
 odgovaraju kriterijumu. Ako ništa ne odgovara, vrati prazan niz. \
