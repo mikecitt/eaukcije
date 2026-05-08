@@ -4,7 +4,7 @@ const path    = require('path');
 const { initDb } = require('./db');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
