@@ -436,6 +436,41 @@
     .empty h3 { font-size: 1rem; color: var(--text); margin-bottom: 6px; }
     .empty p  { font-size: 0.85rem; }
 
+    /* ── App loader ── */
+    #appLoader {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #0f2744 0%, #1d4ed8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    #appLoader.fade-out { opacity: 0; visibility: hidden; pointer-events: none; }
+    .loader-inner { text-align: center; color: white; user-select: none; }
+    .loader-title {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+    .loader-sub {
+      font-size: 0.82rem;
+      opacity: 0.5;
+      letter-spacing: 0.3px;
+      margin-bottom: 44px;
+    }
+    .loader-ring {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: rgba(255,255,255,0.9);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin: 0 auto 16px;
+    }
+    .loader-status { font-size: 0.78rem; opacity: 0.45; letter-spacing: 0.2px; }
+
     /* ── Responsive ── */
     @media (max-width: 700px) {
       .header { padding: 12px 14px; }
@@ -448,6 +483,16 @@
   </style>
 </head>
 <body>
+
+<!-- App loader -->
+<div id="appLoader">
+  <div class="loader-inner">
+    <div class="loader-title">EAukcije</div>
+    <div class="loader-sub">Sudske aukcije nepokretnosti</div>
+    <div class="loader-ring"></div>
+    <div class="loader-status" id="loaderStatus">Učitavanje podataka…</div>
+  </div>
+</div>
 
 <header class="header">
   <div class="header-title">
@@ -645,6 +690,19 @@
   const deletePassword   = $('deletePassword');
   const deleteErr        = $('deleteErr');
 
+  // ── Cyrillic → Serbian Latin ───────────────────────────────────────────────
+  const CYR = {
+    'А':'A','Б':'B','В':'V','Г':'G','Д':'D','Ђ':'Đ','Е':'E','Ж':'Ž','З':'Z',
+    'И':'I','Ј':'J','К':'K','Л':'L','Љ':'Lj','М':'M','Н':'N','Њ':'Nj','О':'O',
+    'П':'P','Р':'R','С':'S','Т':'T','Ћ':'Ć','У':'U','Ф':'F','Х':'H','Ц':'C',
+    'Ч':'Č','Џ':'Dž','Ш':'Š',
+    'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'đ','е':'e','ж':'ž','з':'z',
+    'и':'i','ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n','њ':'nj','о':'o',
+    'п':'p','р':'r','с':'s','т':'t','ћ':'ć','у':'u','ф':'f','х':'h','ц':'c',
+    'ч':'č','џ':'dž','ш':'š',
+  };
+  const cyrToLat = s => s ? [...s].map(c => CYR[c] ?? c).join('') : s;
+
   // ── Strip diacritics for loose Latin search (ž→z, š→s, č/ć→c, đ→d) ───────
   const stripDiacritics = s => s
     .replace(/[žŽ]/g, 'z').replace(/[šŠ]/g, 's')
@@ -673,13 +731,13 @@
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   const statusBadge = (status, translation) => {
-    const t = stripDiacritics((translation || status || '').toLowerCase());
+    const t = stripDiacritics(cyrToLat(translation || status || '').toLowerCase());
     let cls = 'badge-default';
     if (t.includes('potvrđ') || t.includes('potvrd') || t.includes('aktiv')) cls = 'badge-verified';
     else if (t.includes('otkaz') || t.includes('cancel')) cls = 'badge-cancelled';
     else if (t.includes('zavrs') || t.includes('complet')) cls = 'badge-completed';
     else if (t.includes('ceka') || t.includes('pending') || t.includes('objavlj')) cls = 'badge-unverified';
-    return `<span class="badge ${cls}">${esc(translation || status || '—')}</span>`;
+    return `<span class="badge ${cls}">${esc(cyrToLat(translation || status || '—'))}</span>`;
   };
 
   // ── Sorting ────────────────────────────────────────────────────────────────
@@ -720,10 +778,10 @@
     return data.filter(a => {
       if (!showFinished && a.end_date && new Date(a.end_date) < now) return false;
       if (normSearch) {
-        const hay = stripDiacritics(
+        const hay = stripDiacritics(cyrToLat(
           [a.auction_number, a.short_description, a.place_name, a.place_municipality]
             .join(' ').toLowerCase()
-        );
+        ));
         if (!hay.includes(normSearch)) return false;
       }
       if (status && a.status_translation !== status && a.status !== status) return false;
@@ -740,7 +798,7 @@
     fStatus.innerHTML = '<option value="">Svi statusi</option>';
     statuses.forEach(s => {
       const o = document.createElement('option');
-      o.value = s; o.textContent = s;
+      o.value = s; o.textContent = cyrToLat(s);
       if (s === current) o.selected = true;
       fStatus.appendChild(o);
     });
@@ -841,18 +899,37 @@
       : '—';
   };
 
+  // ── App loader ─────────────────────────────────────────────────────────────
+  const appLoader = $('appLoader');
+  const hideLoader = () => {
+    appLoader.classList.add('fade-out');
+    appLoader.addEventListener('transitionend', () => appLoader.remove(), { once: true });
+  };
+
   // ── Data load ──────────────────────────────────────────────────────────────
+  const transformAuction = a => ({
+    ...a,
+    auction_number:     cyrToLat(a.auction_number     || ''),
+    short_description:  cyrToLat(a.short_description  || ''),
+    place_name:         cyrToLat(a.place_name         || ''),
+    place_municipality: cyrToLat(a.place_municipality || ''),
+    status:             cyrToLat(a.status             || ''),
+    status_translation: cyrToLat(a.status_translation || ''),
+  });
+
   const loadAuctions = async () => {
     try {
       const res = await fetch('/api/auctions');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { auctions, lastRefresh } = await res.json();
-      allAuctions = auctions || [];
+      allAuctions = (auctions || []).map(transformAuction);
       populateStatusFilter(allAuctions);
       applyAndRender();
       setLastRefresh(lastRefresh);
     } catch (err) {
       showMsg('error', `Greška pri učitavanju: ${err.message}`);
+    } finally {
+      hideLoader();
     }
   };
 
