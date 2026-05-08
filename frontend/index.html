@@ -471,6 +471,104 @@
     }
     .loader-status { font-size: 0.78rem; opacity: 0.45; letter-spacing: 0.2px; }
 
+    /* ── AI Filter ── */
+    .ai-filter-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+
+    .ai-filter-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .ai-filter-header .ai-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ede9fe;
+      color: #6d28d9;
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .ai-filter-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    #fAiQuery {
+      flex: 1;
+      height: 36px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 0.85rem;
+      color: var(--text);
+      background: var(--light);
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    #fAiQuery:focus {
+      border-color: #7c3aed;
+      background: white;
+    }
+
+    .btn-ai {
+      background: #7c3aed;
+      color: white;
+      border: none;
+      height: 36px;
+      white-space: nowrap;
+    }
+
+    .btn-ai:hover:not(:disabled) { background: #6d28d9; }
+    .btn-ai:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+    .ai-status {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ai-status.active { color: #6d28d9; }
+    .ai-status.error  { color: var(--danger); }
+
+    .btn-ai-clear {
+      background: none;
+      border: 1px solid #d4b4fe;
+      color: #7c3aed;
+      border-radius: 5px;
+      padding: 1px 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.1s;
+    }
+    .btn-ai-clear:hover { background: #ede9fe; }
+
     /* ── Responsive ── */
     @media (max-width: 700px) {
       .header { padding: 12px 14px; }
@@ -598,6 +696,20 @@
     </div>
   </div>
 
+  <!-- AI Filter -->
+  <div class="ai-filter-panel">
+    <div class="ai-filter-header">
+      <span class="ai-label">AI Filter</span>
+      <span class="ai-badge">✦ Claude Haiku</span>
+    </div>
+    <div class="ai-filter-row">
+      <input type="text" id="fAiQuery"
+             placeholder="Opiši šta tražiš — npr. „kuća u Vojvodini ispod 5 miliona" ili „stan blizu Beograda, prva prodaja"">
+      <button class="btn btn-ai" id="aiFilterBtn">Filtriraj AI-em</button>
+    </div>
+    <div class="ai-status" id="aiStatus" style="display:none;"></div>
+  </div>
+
   <!-- Table -->
   <div class="table-card">
     <div class="table-meta">
@@ -666,6 +778,8 @@
   let page    = 1;
   let perPage = 50;
   let busy    = false;
+  let aiMatchIds  = null; // null = inactive, Set = active filter
+  let aiBusy      = false;
 
   // ── DOM ────────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
@@ -689,6 +803,9 @@
   const deleteModal      = $('deleteModal');
   const deletePassword   = $('deletePassword');
   const deleteErr        = $('deleteErr');
+  const fAiQuery         = $('fAiQuery');
+  const aiFilterBtn      = $('aiFilterBtn');
+  const aiStatus         = $('aiStatus');
 
   // ── Cyrillic → Serbian Latin ───────────────────────────────────────────────
   const CYR = {
@@ -788,6 +905,7 @@
       if (firstSale !== '' && String(a.is_first_sale) !== firstSale) return false;
       if (priceMin !== null && (a.starting_price || 0) < priceMin) return false;
       if (priceMax !== null && (a.starting_price || 0) > priceMax) return false;
+      if (aiMatchIds !== null && !aiMatchIds.has(a.id)) return false;
       return true;
     });
   };
@@ -897,6 +1015,61 @@
     $('sAvgPrice').textContent = avg > 0
       ? new Intl.NumberFormat('sr-RS', { notation: 'compact', maximumFractionDigits: 1 }).format(avg) + ' RSD'
       : '—';
+  };
+
+  // ── AI Filter ──────────────────────────────────────────────────────────────
+  const setAiStatus = (type, html) => {
+    aiStatus.style.display = html ? 'flex' : 'none';
+    aiStatus.className = 'ai-status' + (type ? ' ' + type : '');
+    aiStatus.innerHTML = html;
+  };
+
+  const clearAiFilter = () => {
+    aiMatchIds = null;
+    setAiStatus('', '');
+    applyAndRender();
+  };
+
+  const doAiFilter = async () => {
+    const query = fAiQuery.value.trim();
+    if (!query) { fAiQuery.focus(); return; }
+    if (aiBusy) return;
+
+    // Run AI filter against the currently basic-filtered auctions
+    // (without the AI filter itself applied) so the user can iterate
+    const baseFiltered = applyFilters(allAuctions);
+    if (baseFiltered.length === 0) {
+      setAiStatus('error', 'Nema aukcija za filtriranje.');
+      return;
+    }
+
+    aiBusy = true;
+    aiFilterBtn.disabled = true;
+    setAiStatus('', `<div class="spinner" style="border-top-color:#7c3aed;"></div> AI analizira ${baseFiltered.length} aukcija…`);
+
+    try {
+      const res = await fetch('/api/ai-filter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: query, auctions: baseFiltered }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      aiMatchIds = new Set(data.matchingIds);
+      const count = aiMatchIds.size;
+      setAiStatus('active',
+        `✦ AI pronašao <strong>${count}</strong> aukcija koje odgovaraju &mdash; ` +
+        `<button class="btn-ai-clear" id="aiClearBtn">Ukloni AI filter</button>`
+      );
+      $('aiClearBtn').addEventListener('click', clearAiFilter);
+      applyAndRender();
+    } catch (err) {
+      setAiStatus('error', `Greška: ${esc(err.message)}`);
+    } finally {
+      aiBusy = false;
+      aiFilterBtn.disabled = false;
+    }
   };
 
   // ── App loader ─────────────────────────────────────────────────────────────
@@ -1075,8 +1248,14 @@
     fSearch.value = ''; fStatus.value = ''; fFirstSale.value = '';
     fPriceMin.value = ''; fPriceMax.value = '';
     fShowFinished.checked = false;
+    fAiQuery.value = '';
+    aiMatchIds = null;
+    setAiStatus('', '');
     applyAndRender();
   });
+
+  aiFilterBtn.addEventListener('click', doAiFilter);
+  fAiQuery.addEventListener('keydown', e => { if (e.key === 'Enter') doAiFilter(); });
 
   fSearch.addEventListener('input', applyAndRender);
   fStatus.addEventListener('change', applyAndRender);
