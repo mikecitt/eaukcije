@@ -1053,7 +1053,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: query, ids: baseFiltered.map(a => a.id) }),
       });
-      const data = await res.json();
+      let data;
+      try { data = await res.json(); } catch (_) { throw new Error(`HTTP ${res.status}`); }
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
       aiMatchIds = new Set(data.matchingIds);
