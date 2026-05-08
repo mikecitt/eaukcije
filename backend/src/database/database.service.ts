@@ -1,8 +1,8 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 
 @Injectable()
-export class DatabaseService implements OnModuleInit {
+export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   readonly pool: Pool;
 
   constructor() {
@@ -44,5 +44,9 @@ export class DatabaseService implements OnModuleInit {
 
   connect() {
     return this.pool.connect();
+  }
+
+  async onModuleDestroy() {
+    await this.pool.end();
   }
 }

@@ -24,6 +24,11 @@ export class EaukcijaService {
       };
 
       const req = https.request(options, res => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          res.resume();
+          reject(new Error(`HTTP ${res.statusCode} from upstream API`));
+          return;
+        }
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
@@ -40,6 +45,9 @@ export class EaukcijaService {
         });
       });
 
+      req.setTimeout(30_000, () => {
+        req.destroy(new Error('Request timeout'));
+      });
       req.on('error', reject);
       req.write(body);
       req.end();

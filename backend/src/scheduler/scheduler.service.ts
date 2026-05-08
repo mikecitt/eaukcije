@@ -6,12 +6,12 @@ import { RefreshService } from '../refresh/refresh.service';
 export class SchedulerService {
   constructor(private readonly refreshService: RefreshService) {}
 
-  @Cron('0 0 * * *')
+  @Cron('0 0 * * *', { timeZone: 'Europe/Belgrade' })
   async midnight() {
     await this.scheduledRefresh('00:00');
   }
 
-  @Cron('0 12 * * *')
+  @Cron('0 12 * * *', { timeZone: 'Europe/Belgrade' })
   async noon() {
     await this.scheduledRefresh('12:00');
   }

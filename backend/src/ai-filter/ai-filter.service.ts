@@ -60,7 +60,9 @@ Nemoj pisati ništa osim JSON-a.`;
         throw new InternalServerErrorException('Neispravan format odgovora AI agenta.');
       }
 
-      return { matchingIds: parsed.matchingIds };
+      const inputIdSet = new Set(ids);
+      const matchingIds = parsed.matchingIds.filter((id: string) => inputIdSet.has(id));
+      return { matchingIds };
     } catch (err) {
       if (err.status) throw err;
       console.error('AI filter error:', err.message);

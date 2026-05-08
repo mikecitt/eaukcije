@@ -8,7 +8,7 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 COPY --from=builder /app/backend/dist ./backend/dist
 COPY frontend/ ./frontend/
 ENV PORT=3000
