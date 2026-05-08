@@ -32,21 +32,21 @@ describe('POST /api/ai-filter', () => {
     assert.ok(res.body.error);
   });
 
-  test('returns 400 when auctions list is empty', async () => {
+  test('returns 400 when ids list is empty', async () => {
     const res = await request(app)
       .post('/api/ai-filter')
-      .send({ description: 'kuća', auctions: [] });
+      .send({ description: 'kuća', ids: [] });
     assert.equal(res.status, 400);
     assert.ok(res.body.error);
   });
 
-  test('returns 500 when ANTHROPIC_API_KEY is not set', async () => {
+  test('returns 500 when ANTHROPIC_API_KEY is not set', { skip: !dbAvailable && 'PostgreSQL not available' }, async () => {
     const saved = process.env.ANTHROPIC_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
     try {
       const res = await request(app)
         .post('/api/ai-filter')
-        .send({ description: 'kuća', auctions: [{ id: '1', opis: 'test' }] });
+        .send({ description: 'kuća', ids: ['nonexistent-id'] });
       assert.equal(res.status, 500);
       assert.ok(res.body.error);
     } finally {
