@@ -18,7 +18,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 | Database | PostgreSQL via `pg` (async Pool) |
 | Scheduler | `node-cron` — runs at 00:00 and 12:00 UTC daily |
 | Frontend | Vanilla HTML/CSS/JS — single file, no build step |
-| AI filter | Google Generative AI SDK — `gemini-2.0-flash` |
+| AI filter | Google Generative AI SDK — `gemini-2.5-flash` |
 | Deployment | Docker + Docker Compose |
 
 ---
@@ -36,7 +36,7 @@ eaukcije/
 │   ├── routes/
 │   │   ├── auctions.js        # GET /api/auctions, DELETE /api/auctions
 │   │   ├── refresh.js         # POST /api/refresh (SSE streaming)
-│   │   └── ai-filter.js       # POST /api/ai-filter (Claude Haiku)
+│   │   └── ai-filter.js       # POST /api/ai-filter (Gemini 2.5 Flash)
 │   └── services/
 │       └── refresh.js         # Core refresh logic (fetch + enrich + upsert)
 ├── frontend/
@@ -71,7 +71,7 @@ All variables live in `.env` (copy from `.env.example`):
 | `GET` | `/api/auctions` | — | All auctions + last refresh timestamp |
 | `DELETE` | `/api/auctions` | `DB_REMOVE_PASSWORD` in body | Wipe all auction data |
 | `POST` | `/api/refresh` | — | Fetch fresh data from eaukcija.sud.rs; streams SSE progress |
-| `POST` | `/api/ai-filter` | — | Natural language filter via Claude Haiku |
+| `POST` | `/api/ai-filter` | — | Natural language filter via Gemini 2.5 Flash |
 
 ### `POST /api/ai-filter`
 
@@ -88,7 +88,7 @@ Response:
 { "matchingIds": ["abc123", "def456"] }
 ```
 
-Uses `gemini-2.0-flash`. Frontend sends only auction IDs; backend fetches key fields from PostgreSQL (id, opis, mesto, cena_rsd, tip, prva_prodaja) before sending to keep token usage low.
+Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fields from PostgreSQL (id, opis, mesto, cena_rsd, tip, prva_prodaja) before sending to keep token usage low.
 
 ---
 
