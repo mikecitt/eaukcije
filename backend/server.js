@@ -6,6 +6,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
+app.get('/health', (req, res) => res.json({ ok: true }));
+
 app.use('/api/auctions', require('./routes/auctions'));
 app.use('/api/refresh',  require('./routes/refresh'));
 
