@@ -15,9 +15,9 @@ WORKDIR /app
 RUN apk add --no-cache libstdc++
 
 COPY --from=builder /app/node_modules ./node_modules
+# backend rarely changes; frontend changes most often — order optimises layer cache
 COPY backend/  ./backend/
 COPY frontend/ ./frontend/
-COPY package.json ./
 
 RUN mkdir -p /app/data
 

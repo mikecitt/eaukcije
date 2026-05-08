@@ -2,6 +2,7 @@ const express  = require('express');
 const router   = express.Router();
 const db       = require('../db');
 const { fetchAllAuctions, fetchAuctionDetails } = require('../eaukcija-client');
+const { cyrToLat } = require('../utils');
 
 router.post('/', async (req, res) => {
   res.setHeader('Content-Type',  'text/event-stream');
@@ -38,7 +39,7 @@ router.post('/', async (req, res) => {
     const bulkUpdate = db.transaction(list => {
       for (const a of list) {
         updateStmt.run(
-          a.Status, a.StatusTranslation,
+          cyrToLat(a.Status || ''), cyrToLat(a.StatusTranslation || ''),
           a.StartingPrice, a.StartDate, a.EndDate,
           String(a.Id)
         );
@@ -72,16 +73,16 @@ router.post('/', async (req, res) => {
 
       insertStmt.run(
         id,
-        a.AuctionNumber  || '',
-        a.ShortDescription || '',
-        details?.Place?.Name         || '',
-        details?.Place?.Municipality || '',
-        a.Status             || '',
-        a.StatusTranslation  || '',
+        cyrToLat(a.AuctionNumber       || ''),
+        cyrToLat(a.ShortDescription    || ''),
+        cyrToLat(details?.Place?.Name         || ''),
+        cyrToLat(details?.Place?.Municipality || ''),
+        cyrToLat(a.Status              || ''),
+        cyrToLat(a.StatusTranslation   || ''),
         a.StartingPrice      || 0,
         a.StartDate          || '',
         a.EndDate            || '',
-        a.PropertyType       || '',
+        cyrToLat(a.PropertyType        || ''),
         a.IsFirstSale ? 1 : 0,
         details ? 1 : 0,
         JSON.stringify({ auction: a, details }),

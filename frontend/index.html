@@ -392,6 +392,11 @@
 
     /* ── Modal ── */
     dialog {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      margin: 0;
       border: none;
       border-radius: 12px;
       padding: 28px 28px 24px;
@@ -533,9 +538,9 @@
       <label>Cena do (RSD)</label>
       <input type="number" id="fPriceMax" placeholder="∞">
     </div>
-    <div class="fg" style="justify-content:flex-end;">
-      <label>&nbsp;</label>
-      <label class="check-filter">
+    <div class="fg">
+      <label for="fShowFinished">Završene aukcije</label>
+      <label class="check-filter" style="height:32px;">
         <input type="checkbox" id="fShowFinished">
         Prikaži završene
       </label>
@@ -640,19 +645,10 @@
   const deletePassword   = $('deletePassword');
   const deleteErr        = $('deleteErr');
 
-  // ── Latin → Cyrillic transliteration (Serbian) ────────────────────────────
-  const latinToCyrillic = str => {
-    const digraphs = [['lj','љ'],['nj','њ'],['dž','џ'],['dj','ђ']];
-    const map = {
-      'a':'а','b':'б','c':'ц','č':'ч','ć':'ћ','d':'д','đ':'ђ',
-      'e':'е','f':'ф','g':'г','h':'х','i':'и','j':'ј','k':'к',
-      'l':'л','m':'м','n':'н','o':'о','p':'п','r':'р','s':'с',
-      'š':'ш','t':'т','u':'у','v':'в','z':'з','ž':'ж'
-    };
-    let s = str;
-    for (const [lat, cyr] of digraphs) s = s.split(lat).join(cyr);
-    return [...s].map(ch => map[ch] ?? ch).join('');
-  };
+  // ── Strip diacritics for loose Latin search (ž→z, š→s, č/ć→c, đ→d) ───────
+  const stripDiacritics = s => s
+    .replace(/[žŽ]/g, 'z').replace(/[šŠ]/g, 's')
+    .replace(/[čČćĆ]/g, 'c').replace(/[đĐ]/g, 'd');
 
   // ── Formatting ─────────────────────────────────────────────────────────────
   const fmtDate = str => {
@@ -677,12 +673,12 @@
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   const statusBadge = (status, translation) => {
-    const t = (translation || status || '').toLowerCase();
+    const t = stripDiacritics((translation || status || '').toLowerCase());
     let cls = 'badge-default';
-    if (t.includes('potvrđ') || t.includes('verif') || t.includes('aktiv')) cls = 'badge-verified';
+    if (t.includes('potvrđ') || t.includes('potvrd') || t.includes('aktiv')) cls = 'badge-verified';
     else if (t.includes('otkaz') || t.includes('cancel')) cls = 'badge-cancelled';
-    else if (t.includes('završ') || t.includes('complet')) cls = 'badge-completed';
-    else if (t.includes('čeka') || t.includes('pending') || t.includes('objavlj')) cls = 'badge-unverified';
+    else if (t.includes('zavrs') || t.includes('complet')) cls = 'badge-completed';
+    else if (t.includes('ceka') || t.includes('pending') || t.includes('objavlj')) cls = 'badge-unverified';
     return `<span class="badge ${cls}">${esc(translation || status || '—')}</span>`;
   };
 
@@ -713,21 +709,22 @@
 
   // ── Filtering ──────────────────────────────────────────────────────────────
   const applyFilters = data => {
-    const rawSearch  = fSearch.value.trim().toLowerCase();
-    const cyrSearch  = rawSearch ? latinToCyrillic(rawSearch) : '';
-    const status     = fStatus.value;
-    const firstSale  = fFirstSale.value;
-    const priceMin   = fPriceMin.value !== '' ? Number(fPriceMin.value) : null;
-    const priceMax   = fPriceMax.value !== '' ? Number(fPriceMax.value) : null;
+    const normSearch   = stripDiacritics(fSearch.value.trim().toLowerCase());
+    const status       = fStatus.value;
+    const firstSale    = fFirstSale.value;
+    const priceMin     = fPriceMin.value !== '' ? Number(fPriceMin.value) : null;
+    const priceMax     = fPriceMax.value !== '' ? Number(fPriceMax.value) : null;
     const showFinished = fShowFinished.checked;
-    const now        = new Date();
+    const now          = new Date();
 
     return data.filter(a => {
       if (!showFinished && a.end_date && new Date(a.end_date) < now) return false;
-      if (cyrSearch) {
-        const hay = [a.auction_number, a.short_description, a.place_name, a.place_municipality]
-          .join(' ').toLowerCase();
-        if (!hay.includes(cyrSearch) && !hay.includes(rawSearch)) return false;
+      if (normSearch) {
+        const hay = stripDiacritics(
+          [a.auction_number, a.short_description, a.place_name, a.place_municipality]
+            .join(' ').toLowerCase()
+        );
+        if (!hay.includes(normSearch)) return false;
       }
       if (status && a.status_translation !== status && a.status !== status) return false;
       if (firstSale !== '' && String(a.is_first_sale) !== firstSale) return false;
