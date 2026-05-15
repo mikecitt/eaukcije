@@ -79,6 +79,8 @@ All variables live in `.env` (copy from `.env.example`):
 | `DATABASE_URL` | Yes | PostgreSQL connection string, e.g. `postgres://user:pass@host:5432/db` |
 | `POSTGRES_PASSWORD` | Docker only | Password injected into the `postgres` service in Docker Compose |
 | `KOMORA_COURT` | No | Court area string sent to komoraizvrsitelja.rs search; defaults to Novi Sad area |
+| `OLLAMA_URL` | No | Ollama base URL for PDF AI extraction, default `http://localhost:11434` |
+| `OLLAMA_MODEL` | No | Ollama model for PDF extraction, default `llama3.2` |
 
 ---
 
@@ -213,6 +215,7 @@ node backend/dist/main.js
 - **Search endpoint:** `POST /oglasna_tabla/search.php` with `application/x-www-form-urlencoded` body (`userCourtS=<court area>`)
 - Filters PDF links where the filename contains `непокретности` (real estate)
 - Downloads each PDF and extracts text with `pdf-parse`
-- Extracts: case number, property description, location, date and price from the **last** public sale section in the document
+- Sends PDF text to local **Ollama** (`OLLAMA_MODEL`, default `llama3.2`) via `/api/chat` with `format: json` to extract structured data: case number, description, place, date and price of the **last** public sale
+- Falls back to regex extraction if Ollama is unavailable
 - Stored with `source = 'executor'` and `pdf_url` pointing to the original PDF
 - Client is in `backend/src/komora-izvrsitelja/komora-izvrsitelja.service.ts`
