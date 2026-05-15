@@ -36,6 +36,12 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         value TEXT
       );
     `);
+
+    // Migrations — safe to run on existing tables
+    await this.pool.query(`
+      ALTER TABLE auctions ADD COLUMN IF NOT EXISTS source  TEXT DEFAULT 'court';
+      ALTER TABLE auctions ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+    `);
   }
 
   query(text: string, values?: any[]) {

@@ -336,9 +336,24 @@
     .badge-cancelled  { background: #fee2e2; color: #b91c1c; }
     .badge-completed  { background: #dbeafe; color: #1d4ed8; }
     .badge-default    { background: #f1f5f9; color: #475569; }
+    .badge-executor   { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
 
     .first-yes { color: var(--success); font-weight: 700; }
     .first-no  { color: var(--muted); }
+
+    .source-tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      vertical-align: middle;
+      margin-left: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .source-court    { background: #dbeafe; color: #1d4ed8; }
+    .source-executor { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
 
     /* ── Pagination ── */
     .pagination {
@@ -673,6 +688,14 @@
         <option value="0">Ne</option>
       </select>
     </div>
+    <div class="fg">
+      <label>Izvor</label>
+      <select id="fSource">
+        <option value="">Svi izvori</option>
+        <option value="court">Sudske aukcije</option>
+        <option value="executor">Izvršitelji</option>
+      </select>
+    </div>
     <div class="fg fg-price">
       <label>Cena od (RSD)</label>
       <input type="number" id="fPriceMin" placeholder="0">
@@ -740,10 +763,11 @@
             <th class="sortable" data-col="end_date">Kraj <i class="sort-arrow">↕</i></th>
             <th class="sortable" data-col="is_first_sale">1. Prod. <i class="sort-arrow">↕</i></th>
             <th class="sortable" data-col="added_at">Dodata <i class="sort-arrow">↕</i></th>
+            <th>Izvor</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="10">
+          <tr><td colspan="11">
             <div class="empty">
               <h3>Nema podataka</h3>
               <p>Kliknite "Osveži" da preuzmete aukcije iz baze</p>
@@ -794,6 +818,7 @@
   const fSearch          = $('fSearch');
   const fStatus          = $('fStatus');
   const fFirstSale       = $('fFirstSale');
+  const fSource          = $('fSource');
   const fPriceMin        = $('fPriceMin');
   const fPriceMax        = $('fPriceMax');
   const fShowFinished    = $('fShowFinished');
@@ -887,6 +912,7 @@
     const normSearch   = stripDiacritics(fSearch.value.trim().toLowerCase());
     const status       = fStatus.value;
     const firstSale    = fFirstSale.value;
+    const source       = fSource.value;
     const priceMin     = fPriceMin.value !== '' ? Number(fPriceMin.value) : null;
     const priceMax     = fPriceMax.value !== '' ? Number(fPriceMax.value) : null;
     const showFinished = fShowFinished.checked;
@@ -903,6 +929,7 @@
       }
       if (status && a.status_translation !== status && a.status !== status) return false;
       if (firstSale !== '' && String(a.is_first_sale) !== firstSale) return false;
+      if (source && (a.source || 'court') !== source) return false;
       if (priceMin !== null && (a.starting_price || 0) < priceMin) return false;
       if (priceMax !== null && (a.starting_price || 0) > priceMax) return false;
       if (aiMatchIds !== null && !aiMatchIds.has(a.id)) return false;
@@ -941,7 +968,7 @@
       `Prikazano ${filteredAuctions.length.toLocaleString('sr-RS')} od ${allAuctions.length.toLocaleString('sr-RS')} aukcija`;
 
     if (filteredAuctions.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="10"><div class="empty">
+      tableBody.innerHTML = `<tr><td colspan="11"><div class="empty">
         <h3>Nema rezultata</h3>
         <p>${allAuctions.length > 0 ? 'Nema aukcija koje odgovaraju filterima' : 'Kliknite "Osveži" da preuzmete aukcije'}</p>
       </div></td></tr>`;
@@ -950,11 +977,18 @@
     }
 
     tableBody.innerHTML = slice.map((a, i) => {
-      const desc     = a.short_description || '';
-      const descShow = desc.length > 70 ? desc.slice(0, 70) + '…' : desc;
-      return `<tr>
+      const desc        = a.short_description || '';
+      const descShow    = desc.length > 70 ? desc.slice(0, 70) + '…' : desc;
+      const isExecutor  = (a.source || 'court') === 'executor';
+      const auctionHref = isExecutor
+        ? esc(a.pdf_url || '#')
+        : `https://eaukcija.sud.rs/#/aukcije/${esc(a.id)}`;
+      const sourceLabel = isExecutor
+        ? '<span class="source-tag source-executor">Izvršitelj</span>'
+        : '<span class="source-tag source-court">Sud</span>';
+      return `<tr${isExecutor ? ' style="background:#fffbf5;"' : ''}>
         <td class="col-num">${start + i + 1}</td>
-        <td><a class="auction-link" href="https://eaukcija.sud.rs/#/aukcije/${esc(a.id)}" target="_blank" rel="noopener">${esc(a.auction_number || a.id)}</a></td>
+        <td><a class="auction-link" href="${auctionHref}" target="_blank" rel="noopener">${esc(a.auction_number || a.id)}</a></td>
         <td title="${esc(desc)}">${esc(descShow)}</td>
         <td>
           <span class="place-name">${esc(a.place_name || '—')}</span>
@@ -966,6 +1000,7 @@
         <td class="col-date">${fmtDate(a.end_date)}</td>
         <td class="${a.is_first_sale ? 'first-yes' : 'first-no'}">${a.is_first_sale ? 'Da' : 'Ne'}</td>
         <td class="col-added">${fmtDateTime(a.added_at)}</td>
+        <td>${sourceLabel}</td>
       </tr>`;
     }).join('');
 
@@ -1089,6 +1124,9 @@
     place_municipality: cyrToLat(a.place_municipality || ''),
     status:             cyrToLat(a.status             || ''),
     status_translation: cyrToLat(a.status_translation || ''),
+    // source and pdf_url are kept as-is
+    source:   a.source   || 'court',
+    pdf_url:  a.pdf_url  || null,
   });
 
   const loadAuctions = async () => {
@@ -1247,6 +1285,7 @@
 
   $('resetBtn').addEventListener('click', () => {
     fSearch.value = ''; fStatus.value = ''; fFirstSale.value = '';
+    fSource.value = '';
     fPriceMin.value = ''; fPriceMax.value = '';
     fShowFinished.checked = false;
     fAiQuery.value = '';
@@ -1261,6 +1300,7 @@
   fSearch.addEventListener('input', applyAndRender);
   fStatus.addEventListener('change', applyAndRender);
   fFirstSale.addEventListener('change', applyAndRender);
+  fSource.addEventListener('change', applyAndRender);
   fPriceMin.addEventListener('input', applyAndRender);
   fPriceMax.addEventListener('input', applyAndRender);
   fShowFinished.addEventListener('change', applyAndRender);
