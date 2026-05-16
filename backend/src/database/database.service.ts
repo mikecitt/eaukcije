@@ -37,10 +37,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       );
     `);
 
-    // Migrations — safe to run on existing tables
+    // Rollback migration — drops executor-auction columns added in previous deploy
     await this.pool.query(`
-      ALTER TABLE auctions ADD COLUMN IF NOT EXISTS source  TEXT DEFAULT 'court';
-      ALTER TABLE auctions ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+      ALTER TABLE auctions DROP COLUMN IF EXISTS source;
+      ALTER TABLE auctions DROP COLUMN IF EXISTS pdf_url;
     `);
   }
 

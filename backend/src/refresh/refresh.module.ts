@@ -3,10 +3,9 @@ import { RefreshController } from './refresh.controller';
 import { RefreshService } from './refresh.service';
 import { DatabaseModule } from '../database/database.module';
 import { EaukcijaModule } from '../eaukcija/eaukcija.module';
-import { KomoraIzvrsiteljaModule } from '../komora-izvrsitelja/komora-izvrsitelja.module';
 
 @Module({
-  imports: [DatabaseModule, EaukcijaModule, KomoraIzvrsiteljaModule],
+  imports: [DatabaseModule, EaukcijaModule],
   controllers: [RefreshController],
   providers: [RefreshService],
   exports: [RefreshService],

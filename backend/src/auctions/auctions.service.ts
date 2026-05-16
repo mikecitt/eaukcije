@@ -9,8 +9,7 @@ export class AuctionsService {
     const { rows: auctions } = await this.db.query(`
       SELECT id, auction_number, short_description, place_name, place_municipality,
              status, status_translation, starting_price, start_date, end_date,
-             property_type, is_first_sale, details_fetched, added_at,
-             COALESCE(source, 'court') AS source, pdf_url
+             property_type, is_first_sale, details_fetched, added_at
       FROM auctions ORDER BY added_at DESC
     `);
     const { rows } = await this.db.query(
