@@ -36,6 +36,12 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         value TEXT
       );
     `);
+
+    // Rollback migration — drops executor-auction columns added in previous deploy
+    await this.pool.query(`
+      ALTER TABLE auctions DROP COLUMN IF EXISTS source;
+      ALTER TABLE auctions DROP COLUMN IF EXISTS pdf_url;
+    `);
   }
 
   query(text: string, values?: any[]) {

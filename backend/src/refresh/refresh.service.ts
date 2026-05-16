@@ -53,7 +53,7 @@ export class RefreshService {
       try {
         details = await this.eaukcija.fetchAuctionDetails(id);
       } catch (e) {
-        console.error(`Details fetch failed for ${id}: ${e.message}`);
+        console.error(`Details fetch failed for ${id}: ${(e as Error).message}`);
         failed++;
       }
 

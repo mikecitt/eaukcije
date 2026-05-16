@@ -78,6 +78,9 @@ All variables live in `.env` (copy from `.env.example`):
 | `GEMINI_API_KEY` | Yes (for AI filter) | Google Gemini API key — used by `POST /api/ai-filter` |
 | `DATABASE_URL` | Yes | PostgreSQL connection string, e.g. `postgres://user:pass@host:5432/db` |
 | `POSTGRES_PASSWORD` | Docker only | Password injected into the `postgres` service in Docker Compose |
+| `KOMORA_COURT` | No | Court area string sent to komoraizvrsitelja.rs search; defaults to Novi Sad area |
+| `OLLAMA_URL` | No | Ollama base URL for PDF AI extraction, default `http://localhost:11434` |
+| `OLLAMA_MODEL` | No | Ollama model for PDF extraction, default `llama3.2` |
 
 ---
 
@@ -88,7 +91,7 @@ All variables live in `.env` (copy from `.env.example`):
 | `GET` | `/health` | — | Health check |
 | `GET` | `/api/auctions` | — | All auctions + last refresh timestamp |
 | `DELETE` | `/api/auctions` | `DB_REMOVE_PASSWORD` in body | Wipe all auction data |
-| `POST` | `/api/refresh` | — | Fetch fresh data from eaukcija.sud.rs; streams SSE progress |
+| `POST` | `/api/refresh` | — | Fetch fresh data from eaukcija.sud.rs **and** komoraizvrsitelja.rs; streams SSE progress |
 | `POST` | `/api/ai-filter` | — | Natural language filter via Gemini 2.5 Flash |
 
 ### `POST /api/ai-filter`
@@ -131,6 +134,8 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 | `details_fetched` | INTEGER | 0 or 1 — whether detail API was called |
 | `raw_data` | TEXT | Full JSON blob; excluded from `/api/auctions` response |
 | `added_at` | TIMESTAMPTZ | `NOW()` at insert |
+| `source` | TEXT | `'court'` (eaukcija.sud.rs) or `'executor'` (komoraizvrsitelja.rs) |
+| `pdf_url` | TEXT | URL to PDF for executor auctions; `NULL` for court auctions |
 
 **`meta`** — key/value store; currently only `last_refresh` (ISO 8601 string).
 
@@ -154,7 +159,7 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 
 **Filter pipeline** (`applyFilters → sortData → renderTable`):
 
-1. `applyFilters(allAuctions)` — applies text search, status, first sale, price range, show-finished toggle, and `aiMatchIds` set
+1. `applyFilters(allAuctions)` — applies text search, status, first sale, source (court/executor), price range, show-finished toggle, and `aiMatchIds` set
 2. `sortData(...)` — stable sort on the chosen column
 3. `renderTable()` — slices for current page and writes HTML
 
@@ -197,9 +202,20 @@ node backend/dist/main.js
 
 ---
 
-## External API
+## External APIs
 
+### eaukcija.sud.rs (court auctions)
 - **Host:** `eaukcija.sud.rs`
 - **Endpoint used:** `POST /WebApi.Proxy/api/EAukcija/GetAuctionsByCategoryId` (category `7`, pageSize 500)
 - **Detail endpoint:** `POST /WebApi.Proxy/api/EAukcija/GetImmovablePropertyDetails`
 - Client is in `backend/src/eaukcija/eaukcija.service.ts`; no auth required.
+
+### komoraizvrsitelja.rs (executor auctions)
+- **Host:** `www.komoraizvrsitelja.rs`
+- **Search endpoint:** `POST /oglasna_tabla/search.php` with `application/x-www-form-urlencoded` body (`userCourtS=<court area>`)
+- Filters PDF links where the filename contains `непокретности` (real estate)
+- Downloads each PDF and extracts text with `pdf-parse`
+- Sends PDF text to local **Ollama** (`OLLAMA_MODEL`, default `llama3.2`) via `/api/chat` with `format: json` to extract structured data: case number, description, place, date and price of the **last** public sale
+- Falls back to regex extraction if Ollama is unavailable
+- Stored with `source = 'executor'` and `pdf_url` pointing to the original PDF
+- Client is in `backend/src/komora-izvrsitelja/komora-izvrsitelja.service.ts`
