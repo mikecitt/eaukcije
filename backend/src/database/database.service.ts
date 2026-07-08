@@ -43,6 +43,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         role          TEXT NOT NULL DEFAULT 'user',
         created_at    TIMESTAMPTZ DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS favorites (
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        auction_id TEXT NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, auction_id)
+      );
     `);
   }
 

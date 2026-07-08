@@ -51,6 +51,10 @@ eaukcije/
 │   │   │   ├── auctions.module.ts
 │   │   │   ├── auctions.controller.ts # GET open to any logged-in user; DELETE admin-only
 │   │   │   └── auctions.service.ts
+│   │   ├── favorites/
+│   │   │   ├── favorites.module.ts
+│   │   │   ├── favorites.controller.ts # GET/POST/DELETE — any logged-in user, own favorites only
+│   │   │   └── favorites.service.ts
 │   │   ├── refresh/
 │   │   │   ├── refresh.module.ts
 │   │   │   ├── refresh.controller.ts  # POST /api/refresh (SSE streaming, admin-only)
@@ -100,6 +104,7 @@ All variables live in `.env` (copy from `.env.example`):
 - **Regular users** can only view auction data (`GET /api/auctions`) and change their own password. They cannot trigger a refresh, delete the database, use the AI filter, or manage users — those routes reject them with `403`.
 - A default admin account (`admin` / `ProxmoxGuru123`) is seeded automatically on first boot (`AuthService.onModuleInit`) if no `admin` user exists yet. Change the password after first login via `POST /api/auth/change-password`.
 - Admins manage regular user accounts (create/list/delete) via `/api/users`. Users cannot delete their own account, and the seeded `admin` account cannot be deleted via the UI (no delete button rendered for `role: admin`).
+- **Favorites** are personal, not admin-gated: any logged-in user (admin or regular) can star/unstar auctions via `/api/favorites`. Each user only ever sees and mutates their own favorites (scoped by `req.user.sub`).
 
 ---
 
@@ -117,6 +122,9 @@ All variables live in `.env` (copy from `.env.example`):
 | `DELETE` | `/api/users/:id` | Admin | Delete a user account (not self) |
 | `GET` | `/api/auctions` | Logged in | All auctions + last refresh timestamp |
 | `DELETE` | `/api/auctions` | Admin + `DB_REMOVE_PASSWORD` in body | Wipe all auction data |
+| `GET` | `/api/favorites` | Logged in | Array of auction IDs the current user has favorited |
+| `POST` | `/api/favorites/:auctionId` | Logged in | Add an auction to the current user's favorites |
+| `DELETE` | `/api/favorites/:auctionId` | Logged in | Remove an auction from the current user's favorites |
 | `POST` | `/api/refresh` | Admin | Fetch fresh data from eaukcija.sud.rs; streams SSE progress |
 | `POST` | `/api/ai-filter` | Admin | Natural language filter via Gemini 2.5 Flash |
 
@@ -163,6 +171,16 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 
 **`meta`** — key/value store; currently only `last_refresh` (ISO 8601 string).
 
+**`favorites`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | INTEGER | FK → `users(id)` ON DELETE CASCADE; part of composite PK |
+| `auction_id` | TEXT | FK → `auctions(id)` ON DELETE CASCADE; part of composite PK |
+| `created_at` | TIMESTAMPTZ | `NOW()` at insert |
+
+Composite primary key `(user_id, auction_id)` — one row per user/auction favorite. Cascades clean up automatically when a user or auction is deleted (including a full `DELETE /api/auctions` wipe).
+
 **`users`**
 
 | Column | Type | Notes |
@@ -208,12 +226,16 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 | `currentUser` | `{username, role}` for the logged-in session, or `null` |
 | `currentScreen` | `'login' \| 'app' \| 'admin'` — screen the router last settled on |
 | `auctionsLoaded` | Guards against re-fetching `/api/auctions` every time the app view is re-entered |
+| `favoriteIds` | `Set<id>` of the current user's favorited auction IDs, loaded from `/api/favorites` alongside `/api/auctions` |
 
-**Filter pipeline** (`applyFilters → sortData → renderTable`):
+**Filter pipeline** (`applyFilters → sortData → withFavoritesFirst → renderTable`):
 
 1. `applyFilters(allAuctions)` — applies text search, status, first sale, price range, show-finished toggle, and `aiMatchIds` set
 2. `sortData(...)` — stable sort on the chosen column
-3. `renderTable()` — slices for current page and writes HTML
+3. `withFavoritesFirst(...)` — partitions the sorted result so favorited auctions (per `favoriteIds`) float to the front, each group keeping the chosen sort order internally
+4. `renderTable()` — slices for current page and writes HTML; inserts a "★ Favoriti" / "Sve aukcije" group-header row where the favorite/non-favorite groups meet within the visible page
+
+**Favorites UI:** Each row has a star toggle button (leftmost column) that calls `toggleFavorite(id)` — optimistically flips `favoriteIds` and re-renders, then confirms with `POST`/`DELETE /api/favorites/:id`, reverting on failure. Favorited rows get a highlighted background (`.fav-row`).
 
 **Cyrillic handling:** All text is stored as Cyrillic in the DB. `transformAuction()` converts every text field to Serbian Latin at load time using `cyrToLat()`. Search also strips diacritics via `stripDiacritics()` so e.g. `"kuca"` matches `"kuća"`.
 

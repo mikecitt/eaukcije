@@ -7,6 +7,7 @@ import { join } from 'path';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { AuctionsModule } from './auctions/auctions.module';
+import { FavoritesModule } from './favorites/favorites.module';
 import { RefreshModule } from './refresh/refresh.module';
 import { AiFilterModule } from './ai-filter/ai-filter.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
@@ -24,6 +25,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
     DatabaseModule,
     AuthModule,
     AuctionsModule,
+    FavoritesModule,
     RefreshModule,
     AiFilterModule,
     SchedulerModule,
