@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Korisnici — EAukcije</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:      #2563eb;
+      --primary-dark: #1d4ed8;
+      --success:      #16a34a;
+      --danger:       #dc2626;
+      --bg:           #f1f5f9;
+      --card:         #ffffff;
+      --border:       #e2e8f0;
+      --text:         #1e293b;
+      --muted:        #64748b;
+      --light:        #f8fafc;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #0f2744 0%, #1d4ed8 100%);
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    .header-title h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.3px; }
+    .header-title p  { font-size: 0.78rem; opacity: 0.65; margin-top: 2px; }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      line-height: 1;
+      text-decoration: none;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+
+    .btn-ghost { background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.25); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.22); }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+
+    .btn-outline { background: var(--light); color: var(--muted); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--border); color: var(--text); }
+
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: #b91c1c; }
+
+    .main { max-width: 1000px; margin: 0 auto; padding: 18px 16px; }
+
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+      border-left: 4px solid transparent;
+    }
+    .alert-error   { background: #fef2f2; color: #991b1b; border-color: var(--danger); }
+    .alert-success { background: #f0fdf4; color: #166534; border-color: var(--success); }
+    .alert-info    { background: #eff6ff; color: #1e40af; border-color: var(--primary); }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .create-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      padding: 16px;
+    }
+
+    .fg { display: flex; flex-direction: column; gap: 4px; }
+    .fg label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--muted);
+    }
+    .fg input {
+      height: 34px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 0.85rem;
+      outline: none;
+      min-width: 200px;
+    }
+    .fg input:focus { border-color: var(--primary); }
+
+    .form-err {
+      padding: 0 16px 12px;
+      font-size: 0.8rem;
+      color: var(--danger);
+      min-height: 1.1em;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+    thead { background: var(--light); }
+    th {
+      padding: 9px 14px;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--muted);
+      border-bottom: 2px solid var(--border);
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .badge-admin { background: #dcfce7; color: #15803d; }
+    .badge-user  { background: #f1f5f9; color: #475569; }
+
+    .empty { text-align: center; padding: 30px; color: var(--muted); font-size: 0.85rem; }
+
+    dialog {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      margin: 0;
+      border: none;
+      border-radius: 12px;
+      padding: 26px 26px 22px;
+      max-width: 380px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.45); }
+    .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .modal-desc  { font-size: 0.85rem; color: var(--muted); margin-bottom: 18px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-title">
+    <h1>Upravljanje korisnicima</h1>
+    <p>EAukcije — administracija</p>
+  </div>
+  <div class="header-actions">
+    <a class="btn btn-ghost" href="/">← Nazad na aukcije</a>
+    <button class="btn btn-ghost" id="logoutBtn">Odjava</button>
+  </div>
+</header>
+
+<div class="main">
+  <div id="msgBox"></div>
+
+  <div class="card">
+    <div class="card-header">Kreiraj novog korisnika</div>
+    <form class="create-form" id="createForm">
+      <div class="fg">
+        <label for="newUsername">Korisničko ime</label>
+        <input type="text" id="newUsername" required autocomplete="off">
+      </div>
+      <div class="fg">
+        <label for="newPassword">Početna lozinka</label>
+        <input type="password" id="newPassword" required autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" type="submit">Kreiraj korisnika</button>
+    </form>
+    <div class="form-err" id="createErr"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" id="usersCountLabel">Učitavanje...</div>
+    <table>
+      <thead>
+        <tr><th>Korisničko ime</th><th>Uloga</th><th>Kreiran</th><th></th></tr>
+      </thead>
+      <tbody id="usersBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<dialog id="deleteUserModal">
+  <div class="modal-title">Obriši korisnika</div>
+  <div class="modal-desc" id="deleteUserDesc"></div>
+  <div class="modal-actions">
+    <button class="btn btn-outline" id="deleteUserCancelBtn">Odustani</button>
+    <button class="btn btn-danger" id="deleteUserConfirmBtn">Obriši</button>
+  </div>
+</dialog>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  let pendingDeleteId = null;
+
+  const showMsg = (type, text) => {
+    const cls = { error: 'alert-error', success: 'alert-success', info: 'alert-info' }[type] || 'alert-info';
+    $('msgBox').innerHTML = `<div class="alert ${cls}">${esc(text)}</div>`;
+    if (type !== 'error') setTimeout(() => { $('msgBox').innerHTML = ''; }, 6000);
+  };
+
+  const checkAuth = async () => {
+    const res = await fetch('/api/auth/me');
+    if (!res.ok) { window.location.href = '/login.html'; return null; }
+    const { user } = await res.json();
+    if (user.role !== 'admin') { window.location.href = '/'; return null; }
+    return user;
+  };
+
+  const loadUsers = async () => {
+    const res = await fetch('/api/users');
+    if (!res.ok) { showMsg('error', 'Greška pri učitavanju korisnika.'); return; }
+    const users = await res.json();
+    $('usersCountLabel').textContent = `${users.length} korisnika`;
+
+    if (users.length === 0) {
+      $('usersBody').innerHTML = `<tr><td colspan="4"><div class="empty">Nema korisnika</div></td></tr>`;
+      return;
+    }
+
+    $('usersBody').innerHTML = users.map(u => `
+      <tr>
+        <td>${esc(u.username)}</td>
+        <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${esc(u.role)}</span></td>
+        <td>${new Date(u.created_at).toLocaleDateString('sr-RS')}</td>
+        <td>
+          ${u.role !== 'admin'
+            ? `<button class="btn btn-outline" data-id="${u.id}" data-username="${esc(u.username)}" style="padding:4px 10px;">Obriši</button>`
+            : ''}
+        </td>
+      </tr>`).join('');
+
+    $('usersBody').querySelectorAll('button[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pendingDeleteId = btn.dataset.id;
+        $('deleteUserDesc').textContent = `Da li ste sigurni da želite da obrišete korisnika "${btn.dataset.username}"? Ova akcija se ne može poništiti.`;
+        $('deleteUserModal').showModal();
+      });
+    });
+  };
+
+  $('deleteUserCancelBtn').addEventListener('click', () => $('deleteUserModal').close());
+  $('deleteUserConfirmBtn').addEventListener('click', async () => {
+    if (!pendingDeleteId) return;
+    $('deleteUserConfirmBtn').disabled = true;
+    try {
+      const res = await fetch(`/api/users/${pendingDeleteId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      $('deleteUserModal').close();
+      showMsg('info', 'Korisnik je obrisan.');
+      loadUsers();
+    } catch (e) {
+      showMsg('error', e.message);
+    } finally {
+      $('deleteUserConfirmBtn').disabled = false;
+    }
+  });
+
+  $('createForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const username = $('newUsername').value.trim();
+    const password = $('newPassword').value;
+    $('createErr').textContent = '';
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      $('newUsername').value = '';
+      $('newPassword').value = '';
+      showMsg('success', `Korisnik "${username}" je kreiran.`);
+      loadUsers();
+    } catch (e) {
+      $('createErr').textContent = e.message;
+    }
+  });
+
+  $('logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login.html';
+  });
+
+  (async () => {
+    const user = await checkAuth();
+    if (!user) return;
+    loadUsers();
+  })();
+</script>
+</body>
+</html>

@@ -599,7 +599,7 @@
   </div>
   <div class="header-actions">
     <span class="last-refresh-label" id="lastRefreshLabel">Nije osveženo</span>
-    <button class="btn btn-white" id="refreshBtn">
+    <button class="btn btn-white" id="refreshBtn" style="display:none;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
            stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
@@ -608,7 +608,7 @@
       </svg>
       Osveži
     </button>
-    <button class="btn btn-ghost" id="clearBtn">
+    <button class="btn btn-ghost" id="clearBtn" style="display:none;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
            stroke-linecap="round" stroke-linejoin="round">
         <polyline points="3 6 5 6 21 6"/>
@@ -618,6 +618,10 @@
       </svg>
       Obriši bazu
     </button>
+    <a class="btn btn-ghost" id="usersLink" href="/admin.html" style="display:none;">Korisnici</a>
+    <span class="last-refresh-label" id="userBadge"></span>
+    <button class="btn btn-ghost" id="changePwBtn">Lozinka</button>
+    <button class="btn btn-ghost" id="logoutBtn">Odjava</button>
   </div>
 </header>
 
@@ -697,7 +701,7 @@
   </div>
 
   <!-- AI Filter -->
-  <div class="ai-filter-panel">
+  <div class="ai-filter-panel" id="aiFilterPanel" style="display:none;">
     <div class="ai-filter-header">
       <span class="ai-label">AI Filter</span>
       <span class="ai-badge">✦ Gemini Flash</span>
@@ -769,6 +773,19 @@
   </div>
 </dialog>
 
+<!-- Change password modal -->
+<dialog id="changePwModal">
+  <div class="modal-title">Promena lozinke</div>
+  <div class="modal-desc">Unesite trenutnu i novu lozinku (bar 8 karaktera).</div>
+  <input class="modal-input" type="password" id="oldPasswordInput" placeholder="Trenutna lozinka" autocomplete="current-password">
+  <input class="modal-input" type="password" id="newPasswordInput" placeholder="Nova lozinka" autocomplete="new-password">
+  <div class="modal-err" id="changePwErr"></div>
+  <div class="modal-actions">
+    <button class="btn btn-modal-cancel" id="changePwCancelBtn">Odustani</button>
+    <button class="btn btn-modal-confirm" id="changePwConfirmBtn" style="background:var(--primary);">Sačuvaj</button>
+  </div>
+</dialog>
+
 <script>
   // ── State ──────────────────────────────────────────────────────────────────
   let allAuctions      = [];
@@ -780,6 +797,7 @@
   let busy    = false;
   let aiMatchIds  = null; // null = inactive, Set = active filter
   let aiBusy      = false;
+  let currentUser = null;
 
   // ── DOM ────────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
@@ -1208,7 +1226,7 @@
       const data = await res.json();
       if (!res.ok) {
         deletePassword.classList.add('error');
-        deleteErr.textContent = data.error || `Greška (${res.status})`;
+        deleteErr.textContent = data.message || data.error || `Greška (${res.status})`;
         return;
       }
       deleteModal.close();
@@ -1275,9 +1293,87 @@
     th.addEventListener('click', () => setSort(th.dataset.col));
   });
 
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  const checkAuth = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) { window.location.href = '/login.html'; return false; }
+      const data = await res.json();
+      currentUser = data.user;
+      return true;
+    } catch (_) {
+      window.location.href = '/login.html';
+      return false;
+    }
+  };
+
+  const applyRoleUI = () => {
+    const isAdmin = currentUser.role === 'admin';
+    $('userBadge').textContent = `${currentUser.username} (${isAdmin ? 'admin' : 'korisnik'})`;
+    refreshBtn.style.display    = isAdmin ? '' : 'none';
+    clearBtn.style.display      = isAdmin ? '' : 'none';
+    $('aiFilterPanel').style.display = isAdmin ? '' : 'none';
+    $('usersLink').style.display     = isAdmin ? '' : 'none';
+  };
+
+  $('logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login.html';
+  });
+
+  // ── Change password modal ─────────────────────────────────────────────────
+  const changePwModal   = $('changePwModal');
+  const oldPasswordInput = $('oldPasswordInput');
+  const newPasswordInput = $('newPasswordInput');
+  const changePwErr      = $('changePwErr');
+
+  $('changePwBtn').addEventListener('click', () => {
+    oldPasswordInput.value = '';
+    newPasswordInput.value = '';
+    changePwErr.textContent = '';
+    changePwModal.showModal();
+    setTimeout(() => oldPasswordInput.focus(), 50);
+  });
+
+  $('changePwCancelBtn').addEventListener('click', () => changePwModal.close());
+
+  $('changePwConfirmBtn').addEventListener('click', async () => {
+    const oldPassword = oldPasswordInput.value;
+    const newPassword = newPasswordInput.value;
+    if (!oldPassword || !newPassword) {
+      changePwErr.textContent = 'Popunite oba polja.';
+      return;
+    }
+    if (newPassword.length < 8) {
+      changePwErr.textContent = 'Nova lozinka mora imati bar 8 karaktera.';
+      return;
+    }
+    $('changePwConfirmBtn').disabled = true;
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      changePwModal.close();
+      showMsg('success', 'Lozinka je uspešno promenjena.');
+    } catch (err) {
+      changePwErr.textContent = err.message;
+    } finally {
+      $('changePwConfirmBtn').disabled = false;
+    }
+  });
+
   // ── Init ───────────────────────────────────────────────────────────────────
-  syncSortHeaders();
-  loadAuctions();
+  (async () => {
+    const ok = await checkAuth();
+    if (!ok) return;
+    applyRoleUI();
+    syncSortHeaders();
+    loadAuctions();
+  })();
 </script>
 </body>
 </html>

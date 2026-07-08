@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prijava — EAukcije</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:      #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger:       #dc2626;
+      --text:         #1e293b;
+      --muted:        #64748b;
+      --border:       #e2e8f0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f2744 0%, #1d4ed8 100%);
+      padding: 16px;
+    }
+
+    .login-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 32px 28px 26px;
+      width: 360px;
+      max-width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .login-title {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .login-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 4px;
+      margin-bottom: 24px;
+    }
+
+    .fg { margin-bottom: 14px; }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    input {
+      width: 100%;
+      height: 38px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: var(--primary); }
+
+    .login-err {
+      font-size: 0.8rem;
+      color: var(--danger);
+      min-height: 1.1em;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    button {
+      width: 100%;
+      height: 40px;
+      border: none;
+      border-radius: 6px;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover:not(:disabled) { background: var(--primary-dark); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<form class="login-card" id="loginForm" autocomplete="on">
+  <div class="login-title">EAukcije</div>
+  <div class="login-sub">Prijavite se za pristup sistemu</div>
+
+  <div class="fg">
+    <label for="username">Korisničko ime</label>
+    <input type="text" id="username" name="username" autocomplete="username" autofocus required>
+  </div>
+  <div class="fg">
+    <label for="password">Lozinka</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" required>
+  </div>
+
+  <div class="login-err" id="loginErr"></div>
+  <button type="submit" id="loginBtn">Prijavi se</button>
+</form>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  // Already logged in? Skip straight to the app.
+  (async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) window.location.href = '/';
+    } catch (_) { /* ignore */ }
+  })();
+
+  const form  = $('loginForm');
+  const err   = $('loginErr');
+  const btn   = $('loginBtn');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    err.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Prijavljivanje...';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: $('username').value.trim(),
+          password: $('password').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      window.location.href = '/';
+    } catch (e) {
+      err.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = 'Prijavi se';
+    }
+  });
+</script>
+</body>
+</html>

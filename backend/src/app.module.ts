@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
@@ -9,6 +10,8 @@ import { AuctionsModule } from './auctions/auctions.module';
 import { RefreshModule } from './refresh/refresh.module';
 import { AiFilterModule } from './ai-filter/ai-filter.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -19,11 +22,13 @@ import { SchedulerModule } from './scheduler/scheduler.module';
       exclude: ['/api/(.*)'],
     }),
     DatabaseModule,
+    AuthModule,
     AuctionsModule,
     RefreshModule,
     AiFilterModule,
     SchedulerModule,
   ],
   controllers: [AppController],
+  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })
 export class AppModule {}
