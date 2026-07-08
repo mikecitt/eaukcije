@@ -1,8 +1,10 @@
-import { Controller, Post, Res } from '@nestjs/common';
+import { Controller, Post, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { RefreshService } from './refresh.service';
+import { AdminGuard } from '../auth/admin.guard';
 
 @Controller('api/refresh')
+@UseGuards(AdminGuard)
 export class RefreshController {
   constructor(private readonly refreshService: RefreshService) {}
 

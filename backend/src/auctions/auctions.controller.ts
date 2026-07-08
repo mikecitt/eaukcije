@@ -1,5 +1,6 @@
-import { Controller, Get, Delete, Body } from '@nestjs/common';
+import { Controller, Get, Delete, Body, UseGuards } from '@nestjs/common';
 import { AuctionsService } from './auctions.service';
+import { AdminGuard } from '../auth/admin.guard';
 
 @Controller('api/auctions')
 export class AuctionsController {
@@ -11,6 +12,7 @@ export class AuctionsController {
   }
 
   @Delete()
+  @UseGuards(AdminGuard)
   deleteAll(@Body() body: { password: string }) {
     return this.auctionsService.deleteAll(body?.password);
   }

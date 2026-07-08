@@ -17,7 +17,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 | Backend | Node.js + NestJS 10 (TypeScript) |
 | Database | PostgreSQL via `pg` (async Pool, raw queries) |
 | Scheduler | `@nestjs/schedule` (Cron) — runs at 00:00 and 12:00 UTC daily |
-| Frontend | Vanilla HTML/CSS/JS — single file, no build step |
+| Frontend | Vanilla HTML/CSS/JS — single file (`index.html`), no build step; client-side hash router + fade transitions emulate a multi-page SPA |
 | AI filter | Google Generative AI SDK — `gemini-2.5-flash` |
 | Deployment | Docker + Docker Compose (multi-stage build) |
 
@@ -29,26 +29,35 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 eaukcije/
 ├── backend/
 │   ├── src/                        # NestJS TypeScript source
-│   │   ├── main.ts                 # Bootstrap (NestFactory, body-parser limit)
-│   │   ├── app.module.ts           # Root module — imports all feature modules
-│   │   ├── app.controller.ts       # GET /health
+│   │   ├── main.ts                 # Bootstrap (NestFactory, cookie-parser, body-parser limit)
+│   │   ├── app.module.ts           # Root module — imports all feature modules, global JwtAuthGuard
+│   │   ├── app.controller.ts       # GET /health (@Public)
 │   │   ├── database/
 │   │   │   ├── database.module.ts
 │   │   │   └── database.service.ts # pg Pool init & schema (OnModuleInit)
+│   │   ├── auth/
+│   │   │   ├── auth.module.ts
+│   │   │   ├── auth.service.ts        # login, JWT sign/verify, change-password, seeds default admin
+│   │   │   ├── auth.controller.ts     # POST /api/auth/login|logout|change-password, GET /api/auth/me
+│   │   │   ├── users.service.ts       # admin user management (list/create/delete)
+│   │   │   ├── users.controller.ts    # /api/users (admin only)
+│   │   │   ├── jwt-auth.guard.ts      # global guard — verifies `token` cookie, sets req.user
+│   │   │   ├── admin.guard.ts         # per-route guard — requires req.user.role === 'admin'
+│   │   │   └── public.decorator.ts    # @Public() to bypass JwtAuthGuard
 │   │   ├── eaukcija/
 │   │   │   ├── eaukcija.module.ts
 │   │   │   └── eaukcija.service.ts # HTTPS client for eaukcija.sud.rs API
 │   │   ├── auctions/
 │   │   │   ├── auctions.module.ts
-│   │   │   ├── auctions.controller.ts
+│   │   │   ├── auctions.controller.ts # GET open to any logged-in user; DELETE admin-only
 │   │   │   └── auctions.service.ts
 │   │   ├── refresh/
 │   │   │   ├── refresh.module.ts
-│   │   │   ├── refresh.controller.ts  # POST /api/refresh (SSE streaming)
+│   │   │   ├── refresh.controller.ts  # POST /api/refresh (SSE streaming, admin-only)
 │   │   │   └── refresh.service.ts     # Core refresh logic (fetch + enrich + upsert)
 │   │   ├── ai-filter/
 │   │   │   ├── ai-filter.module.ts
-│   │   │   ├── ai-filter.controller.ts
+│   │   │   ├── ai-filter.controller.ts # admin-only
 │   │   │   └── ai-filter.service.ts
 │   │   ├── scheduler/
 │   │   │   ├── scheduler.module.ts
@@ -57,7 +66,8 @@ eaukcije/
 │   │       └── utils.ts               # Cyrillic-to-Latin helpers
 │   └── dist/                       # Compiled JS output (gitignored)
 ├── frontend/
-│   └── index.html                  # Entire UI (~1200 lines, vanilla JS)
+│   └── index.html                  # Entire app (vanilla JS): login screen, main auctions view,
+│                                    # and admin/user-management view, switched via hash router
 ├── package.json
 ├── tsconfig.json
 ├── docker-compose.yml
@@ -78,6 +88,18 @@ All variables live in `.env` (copy from `.env.example`):
 | `GEMINI_API_KEY` | Yes (for AI filter) | Google Gemini API key — used by `POST /api/ai-filter` |
 | `DATABASE_URL` | Yes | PostgreSQL connection string, e.g. `postgres://user:pass@host:5432/db` |
 | `POSTGRES_PASSWORD` | Docker only | Password injected into the `postgres` service in Docker Compose |
+| `JWT_SECRET` | Yes | Secret used to sign/verify login session JWTs. App refuses to start without it. |
+
+---
+
+## Authentication & authorization
+
+- Every `/api/*` route requires a logged-in session except `POST /api/auth/login` and `GET /health` (marked `@Public()`).
+- Sessions are a JWT (7-day expiry) stored in an **httpOnly** cookie named `token`, set on login. `JwtAuthGuard` (global, via `APP_GUARD`) verifies it on every request and attaches `req.user = { sub, username, role }`.
+- Two roles: `admin` and `user`. `AdminGuard` is applied per-controller/route to restrict admin-only actions.
+- **Regular users** can only view auction data (`GET /api/auctions`) and change their own password. They cannot trigger a refresh, delete the database, use the AI filter, or manage users — those routes reject them with `403`.
+- A default admin account (`admin` / `ProxmoxGuru123`) is seeded automatically on first boot (`AuthService.onModuleInit`) if no `admin` user exists yet. Change the password after first login via `POST /api/auth/change-password`.
+- Admins manage regular user accounts (create/list/delete) via `/api/users`. Users cannot delete their own account, and the seeded `admin` account cannot be deleted via the UI (no delete button rendered for `role: admin`).
 
 ---
 
@@ -85,11 +107,18 @@ All variables live in `.env` (copy from `.env.example`):
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/health` | — | Health check |
-| `GET` | `/api/auctions` | — | All auctions + last refresh timestamp |
-| `DELETE` | `/api/auctions` | `DB_REMOVE_PASSWORD` in body | Wipe all auction data |
-| `POST` | `/api/refresh` | — | Fetch fresh data from eaukcija.sud.rs; streams SSE progress |
-| `POST` | `/api/ai-filter` | — | Natural language filter via Gemini 2.5 Flash |
+| `GET` | `/health` | Public | Health check |
+| `POST` | `/api/auth/login` | Public | `{username, password}` → sets `token` cookie, returns `{user}` |
+| `POST` | `/api/auth/logout` | Logged in | Clears the session cookie |
+| `GET` | `/api/auth/me` | Logged in | Returns `{user: {username, role}}` for the current session |
+| `POST` | `/api/auth/change-password` | Logged in | `{oldPassword, newPassword}` — self-service password change (used for the admin's initial password too) |
+| `GET` | `/api/users` | Admin | List all user accounts |
+| `POST` | `/api/users` | Admin | `{username, password}` — create a regular (`role: user`) account |
+| `DELETE` | `/api/users/:id` | Admin | Delete a user account (not self) |
+| `GET` | `/api/auctions` | Logged in | All auctions + last refresh timestamp |
+| `DELETE` | `/api/auctions` | Admin + `DB_REMOVE_PASSWORD` in body | Wipe all auction data |
+| `POST` | `/api/refresh` | Admin | Fetch fresh data from eaukcija.sud.rs; streams SSE progress |
+| `POST` | `/api/ai-filter` | Admin | Natural language filter via Gemini 2.5 Flash |
 
 ### `POST /api/ai-filter`
 
@@ -134,11 +163,36 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 
 **`meta`** — key/value store; currently only `last_refresh` (ISO 8601 string).
 
+**`users`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `username` | TEXT UNIQUE NOT NULL | |
+| `password_hash` | TEXT NOT NULL | bcrypt hash (`bcryptjs`, 10 rounds) |
+| `role` | TEXT NOT NULL DEFAULT `'user'` | `'admin'` or `'user'` |
+| `created_at` | TIMESTAMPTZ | `NOW()` at insert |
+
 ---
 
 ## Frontend architecture
 
-`frontend/index.html` is intentionally a single self-contained file with no build tooling.
+`frontend/index.html` is a single self-contained file with no build tooling — one inline `<style>`/`<script>`. It behaves like a 3-page SPA (login / auctions / user management) via a small hand-rolled hash router instead of separate HTML files, so navigation never triggers a full page reload.
+
+**Screens** (top-level DOM containers, mutually exclusive):
+
+| Element | Shown when |
+|---|---|
+| `#loginScreen` | No valid session (`currentUser === null`) |
+| `#shell` | Logged in — contains the header + one of the two views below |
+| `#shell > #viewApp` | Main auctions table/filters/AI panel (route `#/`) |
+| `#shell > #viewAdmin` | User management, admin only (route `#/admin`) |
+
+**Router:** `targetViewFromHash()` maps `location.hash` (`''`/`#/` → `app`, `#/admin` → `admin`) to a view; non-admins requesting `#/admin` are bounced back to `#/`. `routerImpl()` diffs the requested target against `currentScreen` and crossfades between screens/views via `fadeSwap()` (opacity transition, same visual language as the initial `#appLoader`). Router calls are serialized through a `routerQueue` promise chain — `fadeSwap` takes ~440ms, so two navigation events fired in quick succession (e.g. "home" then "logout") would otherwise run two `routerImpl()` invocations concurrently and corrupt `currentScreen`/DOM state; the queue forces them to run one after another. Always trigger navigation by calling `router()` (or changing `location.hash`, which fires it via the `hashchange` listener) — never call `routerImpl()` directly.
+
+**Header submenu:** Osveži, Korisnici, Promeni lozinku, Obriši bazu, and Odjava are collapsed into a single dropdown (`#dropdownPanel`) opened from `#menuBtn` in the top-right corner, instead of separate header buttons. `applyRoleUI()` hides the admin-only items (`#refreshBtn`, `#clearBtn`, `#usersLink`, `#dangerSep`, `#aiFilterPanel`) unless `role === 'admin'`.
+
+**Auth:** On load, `GET /api/auth/me` determines `currentUser`; failure/401 shows `#loginScreen` instead of the shell (no redirect — same page, same URL). The login form posts to `/api/auth/login` and hands off to the router on success. Logout clears local state and routes back to `#loginScreen`.
 
 **Key state variables:**
 
@@ -151,6 +205,9 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 | `page` / `perPage` | Pagination state |
 | `busy` | Prevents concurrent refresh requests |
 | `aiBusy` | Prevents concurrent AI filter requests |
+| `currentUser` | `{username, role}` for the logged-in session, or `null` |
+| `currentScreen` | `'login' \| 'app' \| 'admin'` — screen the router last settled on |
+| `auctionsLoaded` | Guards against re-fetching `/api/auctions` every time the app view is re-entered |
 
 **Filter pipeline** (`applyFilters → sortData → renderTable`):
 
@@ -168,11 +225,11 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 
 ```bash
 cp .env.example .env
-# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, DATABASE_URL
+# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, DATABASE_URL, JWT_SECRET
 
 npm install
 npm run dev        # ts-node backend/src/main.ts
-# open http://localhost:3000
+# open http://localhost:3000 — log in as admin / ProxmoxGuru123, then change the password
 ```
 
 A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configure.
@@ -181,7 +238,7 @@ A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configur
 
 ```bash
 cp .env.example .env
-# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, POSTGRES_PASSWORD
+# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, POSTGRES_PASSWORD, JWT_SECRET
 
 docker compose up --build
 # open http://localhost:3000
