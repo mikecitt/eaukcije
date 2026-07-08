@@ -17,7 +17,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 | Backend | Node.js + NestJS 10 (TypeScript) |
 | Database | PostgreSQL via `pg` (async Pool, raw queries) |
 | Scheduler | `@nestjs/schedule` (Cron) — runs at 00:00 and 12:00 UTC daily |
-| Frontend | Vanilla HTML/CSS/JS — single file, no build step |
+| Frontend | Vanilla HTML/CSS/JS — single file (`index.html`), no build step; client-side hash router + fade transitions emulate a multi-page SPA |
 | AI filter | Google Generative AI SDK — `gemini-2.5-flash` |
 | Deployment | Docker + Docker Compose (multi-stage build) |
 
@@ -66,9 +66,8 @@ eaukcije/
 │   │       └── utils.ts               # Cyrillic-to-Latin helpers
 │   └── dist/                       # Compiled JS output (gitignored)
 ├── frontend/
-│   ├── index.html                  # Main UI (vanilla JS) — requires login, role-gated controls
-│   ├── login.html                  # Login page
-│   └── admin.html                  # User management page (admin only)
+│   └── index.html                  # Entire app (vanilla JS): login screen, main auctions view,
+│                                    # and admin/user-management view, switched via hash router
 ├── package.json
 ├── tsconfig.json
 ├── docker-compose.yml
@@ -178,11 +177,22 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 
 ## Frontend architecture
 
-`frontend/index.html`, `frontend/login.html`, and `frontend/admin.html` are self-contained files with no build tooling (each ships its own inline `<style>`/`<script>`).
+`frontend/index.html` is a single self-contained file with no build tooling — one inline `<style>`/`<script>`. It behaves like a 3-page SPA (login / auctions / user management) via a small hand-rolled hash router instead of separate HTML files, so navigation never triggers a full page reload.
 
-- `login.html` — login form; posts to `/api/auth/login`, redirects to `/` on success. If already logged in (checked via `/api/auth/me`), redirects to `/` immediately.
-- `admin.html` — user management (admin only). Redirects non-admins to `/`, unauthenticated visitors to `/login.html`. Lists users, creates regular accounts, deletes them.
-- `index.html` — on load, calls `GET /api/auth/me`; redirects to `/login.html` if unauthenticated. `applyRoleUI()` hides `#refreshBtn`, `#clearBtn`, `#aiFilterPanel`, and `#usersLink` unless `role === 'admin'`. Header also exposes a "Lozinka" (change password) modal and a logout button, available to every logged-in user.
+**Screens** (top-level DOM containers, mutually exclusive):
+
+| Element | Shown when |
+|---|---|
+| `#loginScreen` | No valid session (`currentUser === null`) |
+| `#shell` | Logged in — contains the header + one of the two views below |
+| `#shell > #viewApp` | Main auctions table/filters/AI panel (route `#/`) |
+| `#shell > #viewAdmin` | User management, admin only (route `#/admin`) |
+
+**Router:** `targetViewFromHash()` maps `location.hash` (`''`/`#/` → `app`, `#/admin` → `admin`) to a view; non-admins requesting `#/admin` are bounced back to `#/`. `routerImpl()` diffs the requested target against `currentScreen` and crossfades between screens/views via `fadeSwap()` (opacity transition, same visual language as the initial `#appLoader`). Router calls are serialized through a `routerQueue` promise chain — `fadeSwap` takes ~440ms, so two navigation events fired in quick succession (e.g. "home" then "logout") would otherwise run two `routerImpl()` invocations concurrently and corrupt `currentScreen`/DOM state; the queue forces them to run one after another. Always trigger navigation by calling `router()` (or changing `location.hash`, which fires it via the `hashchange` listener) — never call `routerImpl()` directly.
+
+**Header submenu:** Osveži, Korisnici, Promeni lozinku, Obriši bazu, and Odjava are collapsed into a single dropdown (`#dropdownPanel`) opened from `#menuBtn` in the top-right corner, instead of separate header buttons. `applyRoleUI()` hides the admin-only items (`#refreshBtn`, `#clearBtn`, `#usersLink`, `#dangerSep`, `#aiFilterPanel`) unless `role === 'admin'`.
+
+**Auth:** On load, `GET /api/auth/me` determines `currentUser`; failure/401 shows `#loginScreen` instead of the shell (no redirect — same page, same URL). The login form posts to `/api/auth/login` and hands off to the router on success. Logout clears local state and routes back to `#loginScreen`.
 
 **Key state variables:**
 
@@ -195,7 +205,9 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 | `page` / `perPage` | Pagination state |
 | `busy` | Prevents concurrent refresh requests |
 | `aiBusy` | Prevents concurrent AI filter requests |
-| `currentUser` | `{username, role}` for the logged-in session, set by `checkAuth()` |
+| `currentUser` | `{username, role}` for the logged-in session, or `null` |
+| `currentScreen` | `'login' \| 'app' \| 'admin'` — screen the router last settled on |
+| `auctionsLoaded` | Guards against re-fetching `/api/auctions` every time the app view is re-entered |
 
 **Filter pipeline** (`applyFilters → sortData → renderTable`):
 

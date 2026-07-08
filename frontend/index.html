@@ -41,6 +41,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.25);
     }
 
+    .header-title { cursor: pointer; }
     .header-title h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.3px; }
     .header-title p  { font-size: 0.78rem; opacity: 0.65; margin-top: 2px; }
 
@@ -95,11 +96,20 @@
     }
     .btn-outline:hover { background: var(--border); color: var(--text); }
 
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+
     /* ── Main layout ── */
     .main {
       max-width: 1700px;
       margin: 0 auto;
       padding: 18px 16px;
+    }
+
+    .msg-wrap {
+      max-width: 1700px;
+      margin: 0 auto;
+      padding: 12px 16px 0;
     }
 
     /* ── Alerts ── */
@@ -336,6 +346,8 @@
     .badge-cancelled  { background: #fee2e2; color: #b91c1c; }
     .badge-completed  { background: #dbeafe; color: #1d4ed8; }
     .badge-default    { background: #f1f5f9; color: #475569; }
+    .badge-admin      { background: #dcfce7; color: #15803d; }
+    .badge-user       { background: #f1f5f9; color: #475569; }
 
     .first-yes { color: var(--success); font-weight: 700; }
     .first-no  { color: var(--muted); }
@@ -569,6 +581,166 @@
     }
     .btn-ai-clear:hover { background: #ede9fe; }
 
+    /* ── Login screen ── */
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f2744 0%, #1d4ed8 100%);
+      padding: 16px;
+    }
+    .login-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 32px 28px 26px;
+      width: 360px;
+      max-width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-title {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: var(--text);
+      text-align: center;
+    }
+    .login-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 4px;
+      margin-bottom: 24px;
+    }
+    .login-card .fg { margin-bottom: 14px; }
+    .login-card input {
+      width: 100%;
+      height: 38px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: var(--text);
+      outline: none;
+      background: var(--light);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .login-card input:focus { border-color: var(--primary); background: white; }
+    .login-err {
+      font-size: 0.8rem;
+      color: var(--danger);
+      min-height: 1.1em;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .login-card button[type=submit] {
+      width: 100%;
+      height: 40px;
+      border: none;
+      border-radius: 6px;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .login-card button[type=submit]:hover:not(:disabled) { background: var(--primary-dark); }
+    .login-card button[type=submit]:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── App shell ── */
+    #shell { display: none; }
+
+    /* ── Submenu (dropdown) ── */
+    .menu-wrap { position: relative; }
+    .menu-trigger { display: flex; align-items: center; gap: 7px; }
+    .menu-trigger svg { transition: transform 0.15s; }
+    .menu-trigger.open svg { transform: rotate(180deg); }
+    .dropdown-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+      min-width: 215px;
+      padding: 6px;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      z-index: 50;
+    }
+    .dropdown-panel.open { display: flex; }
+    .dropdown-user {
+      padding: 6px 10px 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+    .dropdown-user strong { color: var(--text); font-size: 0.85rem; }
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .dropdown-item:hover { background: var(--light); }
+    .dropdown-item.danger { color: var(--danger); }
+    .dropdown-item.danger:hover { background: #fef2f2; }
+    .dropdown-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+
+    /* ── Admin view (user management) ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .create-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      padding: 16px;
+    }
+    .create-form input {
+      height: 34px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 0.85rem;
+      outline: none;
+      min-width: 200px;
+    }
+    .create-form input:focus { border-color: var(--primary); }
+    .form-err {
+      padding: 0 16px 12px;
+      font-size: 0.8rem;
+      color: var(--danger);
+      min-height: 1.1em;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 700px) {
       .header { padding: 12px 14px; }
@@ -592,172 +764,234 @@
   </div>
 </div>
 
-<header class="header">
-  <div class="header-title">
-    <h1>EAukcije — Nepokretnosti</h1>
-    <p>Sudske aukcije nepokretnosti · eaukcija.sud.rs · Kategorija 7</p>
-  </div>
-  <div class="header-actions">
-    <span class="last-refresh-label" id="lastRefreshLabel">Nije osveženo</span>
-    <button class="btn btn-white" id="refreshBtn" style="display:none;">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10"/>
-        <polyline points="1 20 1 14 7 14"/>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-      Osveži
-    </button>
-    <button class="btn btn-ghost" id="clearBtn" style="display:none;">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14H6L5 6"/>
-        <path d="M10 11v6M14 11v6"/>
-        <path d="M9 6V4h6v2"/>
-      </svg>
-      Obriši bazu
-    </button>
-    <a class="btn btn-ghost" id="usersLink" href="/admin.html" style="display:none;">Korisnici</a>
-    <span class="last-refresh-label" id="userBadge"></span>
-    <button class="btn btn-ghost" id="changePwBtn">Lozinka</button>
-    <button class="btn btn-ghost" id="logoutBtn">Odjava</button>
-  </div>
-</header>
-
-<div class="main">
-  <div id="msgBox"></div>
-
-  <!-- Stats -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="label">Ukupno aukcija</div>
-      <div class="value" id="sTotal">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Prikazano</div>
-      <div class="value" id="sFiltered">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Dodato danas</div>
-      <div class="value" id="sToday">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Prosečna cena</div>
-      <div class="value" id="sAvgPrice" style="font-size:1.1rem;padding-top:4px;">—</div>
-    </div>
-  </div>
-
-  <!-- Progress -->
-  <div id="progressBar">
-    <div class="progress-info">
-      <div class="spinner"></div>
-      <span id="progressText">Osvežavanje...</span>
-    </div>
-    <div class="progress-track">
-      <div class="progress-fill" id="progressFill"></div>
-    </div>
-  </div>
-
-  <!-- Filters -->
-  <div class="filters-panel">
-    <div class="fg fg-search">
-      <label>Pretraga</label>
-      <input type="text" id="fSearch" placeholder="Broj aukcije, opis, mesto...">
+<!-- Login screen -->
+<div id="loginScreen" data-display="flex">
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <div class="login-title">EAukcije</div>
+    <div class="login-sub">Prijavite se za pristup sistemu</div>
+    <div class="fg">
+      <label for="loginUsername">Korisničko ime</label>
+      <input type="text" id="loginUsername" name="username" autocomplete="username" required>
     </div>
     <div class="fg">
-      <label>Status</label>
-      <select id="fStatus"><option value="">Svi statusi</option></select>
+      <label for="loginPassword">Lozinka</label>
+      <input type="password" id="loginPassword" name="password" autocomplete="current-password" required>
     </div>
-    <div class="fg">
-      <label>Prva prodaja</label>
-      <select id="fFirstSale">
-        <option value="">Sve</option>
-        <option value="1">Da</option>
-        <option value="0">Ne</option>
-      </select>
-    </div>
-    <div class="fg fg-price">
-      <label>Cena od (RSD)</label>
-      <input type="number" id="fPriceMin" placeholder="0">
-    </div>
-    <div class="fg fg-price">
-      <label>Cena do (RSD)</label>
-      <input type="number" id="fPriceMax" placeholder="∞">
-    </div>
-    <div class="fg">
-      <label for="fShowFinished">Završene aukcije</label>
-      <label class="check-filter" style="height:32px;">
-        <input type="checkbox" id="fShowFinished">
-        Prikaži završene
-      </label>
-    </div>
-    <div class="fg" style="justify-content:flex-end;">
-      <label>&nbsp;</label>
-      <button class="btn btn-outline" id="resetBtn" style="height:32px;padding:0 12px;font-size:0.8rem;">
-        Resetuj filtere
-      </button>
-    </div>
-  </div>
+    <div class="login-err" id="loginErr"></div>
+    <button type="submit" id="loginBtn">Prijavi se</button>
+  </form>
+</div>
 
-  <!-- AI Filter -->
-  <div class="ai-filter-panel" id="aiFilterPanel" style="display:none;">
-    <div class="ai-filter-header">
-      <span class="ai-label">AI Filter</span>
-      <span class="ai-badge">✦ Gemini Flash</span>
+<!-- Authenticated shell -->
+<div id="shell">
+  <header class="header">
+    <div class="header-title" id="homeLink">
+      <h1 id="headerTitleText">EAukcije — Nepokretnosti</h1>
+      <p id="headerSubtitleText">Sudske aukcije nepokretnosti · eaukcija.sud.rs · Kategorija 7</p>
     </div>
-    <div class="ai-filter-row">
-      <input type="text" id="fAiQuery"
-             placeholder="Opiši šta tražiš — npr. „kuća u Vojvodini ispod 5 miliona" ili „stan blizu Beograda, prva prodaja"">
-      <button class="btn btn-ai" id="aiFilterBtn">Filtriraj AI-em</button>
+    <div class="header-actions">
+      <span class="last-refresh-label" id="lastRefreshLabel">Nije osveženo</span>
+      <div class="menu-wrap" id="menuWrap">
+        <button class="btn btn-ghost menu-trigger" id="menuBtn">
+          <span id="userBadge"></span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+               stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="dropdown-panel" id="dropdownPanel">
+          <div class="dropdown-user" id="dropdownUserInfo"></div>
+          <button class="dropdown-item" id="refreshBtn" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Osveži
+          </button>
+          <button class="dropdown-item" id="usersLink" style="display:none;">Korisnici</button>
+          <button class="dropdown-item" id="changePwBtn">Promeni lozinku</button>
+          <div class="dropdown-sep" id="dangerSep" style="display:none;"></div>
+          <button class="dropdown-item danger" id="clearBtn" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+            Obriši bazu
+          </button>
+          <div class="dropdown-sep"></div>
+          <button class="dropdown-item danger" id="logoutBtn">Odjava</button>
+        </div>
+      </div>
     </div>
-    <div class="ai-status" id="aiStatus" style="display:none;"></div>
-  </div>
+  </header>
 
-  <!-- Table -->
-  <div class="table-card">
-    <div class="table-meta">
-      <span id="tableCountLabel">Učitavanje...</span>
-      <div class="per-page">
-        <span>Redova po stranici:</span>
-        <select id="perPage">
-          <option value="25">25</option>
-          <option value="50" selected>50</option>
-          <option value="100">100</option>
-          <option value="250">250</option>
-          <option value="0">Sve</option>
-        </select>
+  <div class="msg-wrap"><div id="msgBox"></div></div>
+
+  <!-- App view -->
+  <div id="viewApp" class="view main">
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Ukupno aukcija</div>
+        <div class="value" id="sTotal">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Prikazano</div>
+        <div class="value" id="sFiltered">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Dodato danas</div>
+        <div class="value" id="sToday">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Prosečna cena</div>
+        <div class="value" id="sAvgPrice" style="font-size:1.1rem;padding-top:4px;">—</div>
       </div>
     </div>
 
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th class="sortable" data-col="auction_number">Br. aukcije <i class="sort-arrow">↕</i></th>
-            <th>Opis</th>
-            <th class="sortable" data-col="place_name">Mesto <i class="sort-arrow">↕</i></th>
-            <th class="sortable" data-col="status_translation">Status <i class="sort-arrow">↕</i></th>
-            <th class="sortable" data-col="starting_price">Poc. cena <i class="sort-arrow">↕</i></th>
-            <th class="sortable" data-col="start_date">Pocetak <i class="sort-arrow">↕</i></th>
-            <th class="sortable" data-col="end_date">Kraj <i class="sort-arrow">↕</i></th>
-            <th class="sortable" data-col="is_first_sale">1. Prod. <i class="sort-arrow">↕</i></th>
-            <th class="sortable" data-col="added_at">Dodata <i class="sort-arrow">↕</i></th>
-          </tr>
-        </thead>
-        <tbody id="tableBody">
-          <tr><td colspan="10">
-            <div class="empty">
-              <h3>Nema podataka</h3>
-              <p>Kliknite "Osveži" da preuzmete aukcije iz baze</p>
-            </div>
-          </td></tr>
-        </tbody>
-      </table>
+    <!-- Progress -->
+    <div id="progressBar">
+      <div class="progress-info">
+        <div class="spinner"></div>
+        <span id="progressText">Osvežavanje...</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
     </div>
 
-    <div class="pagination" id="paginationEl" style="display:none;"></div>
+    <!-- Filters -->
+    <div class="filters-panel">
+      <div class="fg fg-search">
+        <label>Pretraga</label>
+        <input type="text" id="fSearch" placeholder="Broj aukcije, opis, mesto...">
+      </div>
+      <div class="fg">
+        <label>Status</label>
+        <select id="fStatus"><option value="">Svi statusi</option></select>
+      </div>
+      <div class="fg">
+        <label>Prva prodaja</label>
+        <select id="fFirstSale">
+          <option value="">Sve</option>
+          <option value="1">Da</option>
+          <option value="0">Ne</option>
+        </select>
+      </div>
+      <div class="fg fg-price">
+        <label>Cena od (RSD)</label>
+        <input type="number" id="fPriceMin" placeholder="0">
+      </div>
+      <div class="fg fg-price">
+        <label>Cena do (RSD)</label>
+        <input type="number" id="fPriceMax" placeholder="∞">
+      </div>
+      <div class="fg">
+        <label for="fShowFinished">Završene aukcije</label>
+        <label class="check-filter" style="height:32px;">
+          <input type="checkbox" id="fShowFinished">
+          Prikaži završene
+        </label>
+      </div>
+      <div class="fg" style="justify-content:flex-end;">
+        <label>&nbsp;</label>
+        <button class="btn btn-outline" id="resetBtn" style="height:32px;padding:0 12px;font-size:0.8rem;">
+          Resetuj filtere
+        </button>
+      </div>
+    </div>
+
+    <!-- AI Filter -->
+    <div class="ai-filter-panel" id="aiFilterPanel" style="display:none;">
+      <div class="ai-filter-header">
+        <span class="ai-label">AI Filter</span>
+        <span class="ai-badge">✦ Gemini Flash</span>
+      </div>
+      <div class="ai-filter-row">
+        <input type="text" id="fAiQuery"
+               placeholder="Opiši šta tražiš — npr. „kuća u Vojvodini ispod 5 miliona" ili „stan blizu Beograda, prva prodaja"">
+        <button class="btn btn-ai" id="aiFilterBtn">Filtriraj AI-em</button>
+      </div>
+      <div class="ai-status" id="aiStatus" style="display:none;"></div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      <div class="table-meta">
+        <span id="tableCountLabel">Učitavanje...</span>
+        <div class="per-page">
+          <span>Redova po stranici:</span>
+          <select id="perPage">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="0">Sve</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th class="sortable" data-col="auction_number">Br. aukcije <i class="sort-arrow">↕</i></th>
+              <th>Opis</th>
+              <th class="sortable" data-col="place_name">Mesto <i class="sort-arrow">↕</i></th>
+              <th class="sortable" data-col="status_translation">Status <i class="sort-arrow">↕</i></th>
+              <th class="sortable" data-col="starting_price">Poc. cena <i class="sort-arrow">↕</i></th>
+              <th class="sortable" data-col="start_date">Pocetak <i class="sort-arrow">↕</i></th>
+              <th class="sortable" data-col="end_date">Kraj <i class="sort-arrow">↕</i></th>
+              <th class="sortable" data-col="is_first_sale">1. Prod. <i class="sort-arrow">↕</i></th>
+              <th class="sortable" data-col="added_at">Dodata <i class="sort-arrow">↕</i></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="10">
+              <div class="empty">
+                <h3>Nema podataka</h3>
+                <p>Kliknite "Osveži" da preuzmete aukcije iz baze</p>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination" id="paginationEl" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Admin view (user management) -->
+  <div id="viewAdmin" class="view main" style="display:none;">
+    <div class="card">
+      <div class="card-header">Kreiraj novog korisnika</div>
+      <form class="create-form" id="createUserForm">
+        <div class="fg">
+          <label for="newUsername">Korisničko ime</label>
+          <input type="text" id="newUsername" required autocomplete="off">
+        </div>
+        <div class="fg">
+          <label for="newPassword">Početna lozinka</label>
+          <input type="password" id="newPassword" required autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary" type="submit">Kreiraj korisnika</button>
+      </form>
+      <div class="form-err" id="createUserErr"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header" id="usersCountLabel">Učitavanje...</div>
+      <table>
+        <thead>
+          <tr><th>Korisničko ime</th><th>Uloga</th><th>Kreiran</th><th></th></tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -783,6 +1017,16 @@
   <div class="modal-actions">
     <button class="btn btn-modal-cancel" id="changePwCancelBtn">Odustani</button>
     <button class="btn btn-modal-confirm" id="changePwConfirmBtn" style="background:var(--primary);">Sačuvaj</button>
+  </div>
+</dialog>
+
+<!-- Delete user confirmation modal -->
+<dialog id="deleteUserModal">
+  <div class="modal-title">Obriši korisnika</div>
+  <div class="modal-desc" id="deleteUserDesc"></div>
+  <div class="modal-actions">
+    <button class="btn btn-modal-cancel" id="deleteUserCancelBtn">Odustani</button>
+    <button class="btn btn-modal-confirm" id="deleteUserConfirmBtn">Obriši</button>
   </div>
 </dialog>
 
@@ -1073,7 +1317,7 @@
       });
       let data;
       try { data = await res.json(); } catch (_) { throw new Error(`HTTP ${res.status}`); }
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
 
       aiMatchIds = new Set(data.matchingIds);
       const count = aiMatchIds.size;
@@ -1120,8 +1364,6 @@
       setLastRefresh(lastRefresh);
     } catch (err) {
       showMsg('error', `Greška pri učitavanju: ${err.message}`);
-    } finally {
-      hideLoader();
     }
   };
 
@@ -1251,7 +1493,7 @@
 
   const clearMsg = () => { msgBox.innerHTML = ''; };
 
-  // ── Wire up events ─────────────────────────────────────────────────────────
+  // ── Wire up main-view events ──────────────────────────────────────────────
   refreshBtn.addEventListener('click', doRefresh);
   clearBtn.addEventListener('click', doClear);
 
@@ -1293,41 +1535,94 @@
     th.addEventListener('click', () => setSort(th.dataset.col));
   });
 
-  // ── Auth ───────────────────────────────────────────────────────────────────
-  const checkAuth = async () => {
+  // ── User management (admin view) ──────────────────────────────────────────
+  let pendingDeleteUserId = null;
+  const deleteUserModal = $('deleteUserModal');
+
+  const loadUsers = async () => {
     try {
-      const res = await fetch('/api/auth/me');
-      if (!res.ok) { window.location.href = '/login.html'; return false; }
-      const data = await res.json();
-      currentUser = data.user;
-      return true;
-    } catch (_) {
-      window.location.href = '/login.html';
-      return false;
+      const res = await fetch('/api/users');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const users = await res.json();
+      $('usersCountLabel').textContent = `${users.length} korisnika`;
+
+      if (users.length === 0) {
+        $('usersBody').innerHTML = `<tr><td colspan="4"><div class="empty">Nema korisnika</div></td></tr>`;
+        return;
+      }
+
+      $('usersBody').innerHTML = users.map(u => `
+        <tr>
+          <td>${esc(u.username)}</td>
+          <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${esc(u.role)}</span></td>
+          <td class="col-added">${new Date(u.created_at).toLocaleDateString('sr-RS')}</td>
+          <td>
+            ${u.role !== 'admin'
+              ? `<button class="btn btn-outline" data-id="${u.id}" data-username="${esc(u.username)}" style="padding:4px 10px;">Obriši</button>`
+              : ''}
+          </td>
+        </tr>`).join('');
+
+      $('usersBody').querySelectorAll('button[data-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          pendingDeleteUserId = btn.dataset.id;
+          $('deleteUserDesc').textContent = `Da li ste sigurni da želite da obrišete korisnika "${btn.dataset.username}"? Ova akcija se ne može poništiti.`;
+          deleteUserModal.showModal();
+        });
+      });
+    } catch (err) {
+      showMsg('error', `Greška pri učitavanju korisnika: ${err.message}`);
     }
   };
 
-  const applyRoleUI = () => {
-    const isAdmin = currentUser.role === 'admin';
-    $('userBadge').textContent = `${currentUser.username} (${isAdmin ? 'admin' : 'korisnik'})`;
-    refreshBtn.style.display    = isAdmin ? '' : 'none';
-    clearBtn.style.display      = isAdmin ? '' : 'none';
-    $('aiFilterPanel').style.display = isAdmin ? '' : 'none';
-    $('usersLink').style.display     = isAdmin ? '' : 'none';
-  };
+  $('deleteUserCancelBtn').addEventListener('click', () => deleteUserModal.close());
+  $('deleteUserConfirmBtn').addEventListener('click', async () => {
+    if (!pendingDeleteUserId) return;
+    $('deleteUserConfirmBtn').disabled = true;
+    try {
+      const res = await fetch(`/api/users/${pendingDeleteUserId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      deleteUserModal.close();
+      showMsg('info', 'Korisnik je obrisan.');
+      loadUsers();
+    } catch (err) {
+      showMsg('error', err.message);
+    } finally {
+      $('deleteUserConfirmBtn').disabled = false;
+    }
+  });
 
-  $('logoutBtn').addEventListener('click', async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login.html';
+  $('createUserForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const username = $('newUsername').value.trim();
+    const password = $('newPassword').value;
+    $('createUserErr').textContent = '';
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      $('newUsername').value = '';
+      $('newPassword').value = '';
+      showMsg('success', `Korisnik "${username}" je kreiran.`);
+      loadUsers();
+    } catch (err) {
+      $('createUserErr').textContent = err.message;
+    }
   });
 
   // ── Change password modal ─────────────────────────────────────────────────
-  const changePwModal   = $('changePwModal');
+  const changePwModal    = $('changePwModal');
   const oldPasswordInput = $('oldPasswordInput');
   const newPasswordInput = $('newPasswordInput');
   const changePwErr      = $('changePwErr');
 
   $('changePwBtn').addEventListener('click', () => {
+    closeMenu();
     oldPasswordInput.value = '';
     newPasswordInput.value = '';
     changePwErr.textContent = '';
@@ -1366,13 +1661,218 @@
     }
   });
 
+  // ── Submenu (dropdown) ────────────────────────────────────────────────────
+  const menuBtn       = $('menuBtn');
+  const dropdownPanel = $('dropdownPanel');
+
+  const closeMenu = () => {
+    dropdownPanel.classList.remove('open');
+    menuBtn.classList.remove('open');
+  };
+  const toggleMenu = () => {
+    dropdownPanel.classList.toggle('open');
+    menuBtn.classList.toggle('open');
+  };
+
+  menuBtn.addEventListener('click', e => { e.stopPropagation(); toggleMenu(); });
+  document.addEventListener('click', e => {
+    if (!dropdownPanel.contains(e.target) && e.target !== menuBtn && !menuBtn.contains(e.target)) closeMenu();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+  dropdownPanel.addEventListener('click', e => {
+    if (e.target.closest('.dropdown-item')) closeMenu();
+  });
+
+  $('homeLink').addEventListener('click', () => { location.hash = '#/'; });
+
+  // ── Auth & client-side router ─────────────────────────────────────────────
+  const loginScreen  = $('loginScreen');
+  const shell        = $('shell');
+  const viewApp       = $('viewApp');
+  const viewAdmin      = $('viewAdmin');
+
+  let currentScreen   = null; // 'login' | 'app' | 'admin'
+  let auctionsLoaded  = false;
+
+  const fadeSwap = (hideEl, showEl, duration = 220) => new Promise(resolve => {
+    const reveal = () => {
+      if (hideEl) hideEl.style.display = 'none';
+      showEl.style.display = showEl.dataset.display || 'block';
+      showEl.style.opacity = '0';
+      void showEl.offsetWidth;
+      showEl.style.transition = `opacity ${duration}ms ease`;
+      requestAnimationFrame(() => { showEl.style.opacity = '1'; });
+      setTimeout(resolve, duration);
+    };
+    if (!hideEl || hideEl === showEl) { reveal(); return; }
+    hideEl.style.transition = `opacity ${duration}ms ease`;
+    hideEl.style.opacity = '0';
+    setTimeout(reveal, duration);
+  });
+
+  const applyRoleUI = () => {
+    if (!currentUser) return;
+    const isAdmin = currentUser.role === 'admin';
+    $('userBadge').textContent = currentUser.username;
+    $('dropdownUserInfo').innerHTML = `<strong>${esc(currentUser.username)}</strong><br>${isAdmin ? 'Administrator' : 'Korisnik'}`;
+    refreshBtn.style.display   = isAdmin ? '' : 'none';
+    clearBtn.style.display     = isAdmin ? '' : 'none';
+    $('usersLink').style.display = isAdmin ? '' : 'none';
+    $('dangerSep').style.display = isAdmin ? '' : 'none';
+    $('aiFilterPanel').style.display = isAdmin ? '' : 'none';
+  };
+
+  const updateHeaderForView = view => {
+    if (view === 'admin') {
+      $('headerTitleText').textContent = 'Upravljanje korisnicima';
+      $('headerSubtitleText').textContent = 'EAukcije — administracija';
+    } else {
+      $('headerTitleText').textContent = 'EAukcije — Nepokretnosti';
+      $('headerSubtitleText').textContent = 'Sudske aukcije nepokretnosti · eaukcija.sud.rs · Kategorija 7';
+    }
+  };
+
+  const onEnterView = view => {
+    if (view === 'admin') {
+      loadUsers();
+    } else if (!auctionsLoaded) {
+      auctionsLoaded = true;
+      loadAuctions();
+    }
+  };
+
+  const targetViewFromHash = () => (location.hash.replace(/^#\/?/, '') === 'admin' ? 'admin' : 'app');
+
+  const routerImpl = async () => {
+    closeMenu();
+
+    if (!currentUser) {
+      if (currentScreen === 'login') return;
+      await fadeSwap(shell, loginScreen);
+      currentScreen = 'login';
+      return;
+    }
+
+    let target = targetViewFromHash();
+    if (target === 'admin' && currentUser.role !== 'admin') {
+      history.replaceState(null, '', '#/');
+      target = 'app';
+    }
+
+    if (currentScreen === 'login') {
+      viewApp.style.display   = target === 'app'   ? '' : 'none';
+      viewAdmin.style.display = target === 'admin' ? '' : 'none';
+      updateHeaderForView(target);
+      await fadeSwap(loginScreen, shell);
+      currentScreen = target;
+      onEnterView(target);
+      return;
+    }
+
+    if (currentScreen !== target) {
+      const hideEl = currentScreen === 'admin' ? viewAdmin : viewApp;
+      const showEl = target === 'admin' ? viewAdmin : viewApp;
+      updateHeaderForView(target);
+      await fadeSwap(hideEl, showEl);
+      currentScreen = target;
+      onEnterView(target);
+    }
+  };
+
+  // Serialize router invocations — a rapid sequence of navigation events
+  // (e.g. logout right after a hash change) would otherwise run two
+  // routerImpl() calls concurrently, and each awaits a ~440ms fade while
+  // reading/writing the shared currentScreen var, corrupting the screen state.
+  let routerQueue = Promise.resolve();
+  const router = () => {
+    routerQueue = routerQueue.then(routerImpl, routerImpl);
+    return routerQueue;
+  };
+
+  window.addEventListener('hashchange', router);
+
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const err = $('loginErr');
+    const btn = $('loginBtn');
+    err.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Prijavljivanje...';
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: $('loginUsername').value.trim(),
+          password: $('loginPassword').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      currentUser = data.user;
+      $('loginUsername').value = '';
+      $('loginPassword').value = '';
+      applyRoleUI();
+      history.replaceState(null, '', '#/');
+      await router();
+    } catch (e) {
+      err.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Prijavi se';
+    }
+  });
+
+  $('logoutBtn').addEventListener('click', async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
+    currentUser = null;
+    auctionsLoaded = false;
+    allAuctions = []; filteredAuctions = [];
+    populateStatusFilter([]);
+    applyAndRender();
+    setLastRefresh(null);
+    history.replaceState(null, '', '#/');
+    await router();
+  });
+
+  $('usersLink').addEventListener('click', () => { location.hash = '#/admin'; });
+
   // ── Init ───────────────────────────────────────────────────────────────────
   (async () => {
-    const ok = await checkAuth();
-    if (!ok) return;
-    applyRoleUI();
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        currentUser = data.user;
+      }
+    } catch (_) { /* treat as unauthenticated */ }
+
     syncSortHeaders();
-    loadAuctions();
+
+    if (currentUser) {
+      applyRoleUI();
+      let target = targetViewFromHash();
+      if (target === 'admin' && currentUser.role !== 'admin') target = 'app';
+      history.replaceState(null, '', target === 'admin' ? '#/admin' : '#/');
+
+      viewApp.style.display   = target === 'app'   ? '' : 'none';
+      viewAdmin.style.display = target === 'admin' ? '' : 'none';
+      updateHeaderForView(target);
+      shell.style.display = 'block';
+      currentScreen = target;
+
+      if (target === 'admin') {
+        await loadUsers();
+      } else {
+        auctionsLoaded = true;
+        await loadAuctions();
+      }
+    } else {
+      loginScreen.style.display = loginScreen.dataset.display;
+      currentScreen = 'login';
+    }
+
+    hideLoader();
   })();
 </script>
 </body>
