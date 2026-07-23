@@ -27,8 +27,14 @@ export class SchedulerService implements OnModuleInit {
 
   async onModuleInit() {
     const { rows } = await this.db.query('SELECT value FROM meta WHERE key = $1', [CRON_KEY]);
-    const cron = rows[0]?.value || SCHEDULE_PRESETS.find(p => p.id === DEFAULT_PRESET)!.cron!;
-    this.installJob(cron);
+    const fallback = SCHEDULE_PRESETS.find(p => p.id === DEFAULT_PRESET)!.cron!;
+    const cron = rows[0]?.value || fallback;
+    try {
+      this.installJob(cron);
+    } catch (err) {
+      console.error(`[scheduler] Invalid persisted cron "${cron}" (${err.message}); falling back to default schedule.`);
+      this.installJob(fallback);
+    }
   }
 
   getPresets() {

@@ -1778,7 +1778,7 @@
 
   const renderScheduleForm = (presets, current) => {
     schedulePresetSel.innerHTML = presets.map(p =>
-      `<option value="${p.id}">${esc(p.label)}</option>`).join('');
+      `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('');
     schedulePresetSel.value = current.preset;
     toggleCustomFields();
     scheduleCronInput.value = current.preset === 'custom' ? current.cron : '';
