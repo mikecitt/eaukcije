@@ -836,6 +836,11 @@
             Osveži
           </button>
           <button class="dropdown-item" id="usersLink" style="display:none;">Korisnici</button>
+          <button class="dropdown-item" id="scheduleSettingsBtn" style="display:none;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+            Podešavanja osvežavanja
+          </button>
           <button class="dropdown-item" id="changePwBtn">Promeni lozinku</button>
           <div class="dropdown-sep" id="dangerSep" style="display:none;"></div>
           <button class="dropdown-item danger" id="clearBtn" style="display:none;">
@@ -1045,6 +1050,23 @@
   <div class="modal-actions">
     <button class="btn btn-modal-cancel" id="changePwCancelBtn">Odustani</button>
     <button class="btn btn-modal-confirm" id="changePwConfirmBtn" style="background:var(--primary);">Sačuvaj</button>
+  </div>
+</dialog>
+
+<!-- Auto-refresh schedule modal -->
+<dialog id="scheduleModal">
+  <div class="modal-title">Podešavanja automatskog osvežavanja</div>
+  <div class="modal-desc">Izaberite koliko često se aukcije automatski osvežavaju.</div>
+  <select class="modal-input" id="schedulePresetSelect"></select>
+  <input class="modal-input" type="text" id="scheduleCronInput" placeholder="npr. 0 */6 * * *" style="display:none; font-family:monospace;">
+  <div class="modal-desc" id="scheduleCronHint" style="display:none; margin-top:-4px;">
+    Format: minut sat dan-u-mesecu mesec dan-u-nedelji (npr. <code>0 0,12 * * *</code> = u 00:00 i 12:00 svaki dan).
+  </div>
+  <div class="modal-desc" id="scheduleNextRun" style="margin-bottom:14px;"></div>
+  <div class="modal-err" id="scheduleErr"></div>
+  <div class="modal-actions">
+    <button class="btn btn-modal-cancel" id="scheduleCancelBtn">Odustani</button>
+    <button class="btn btn-modal-confirm" id="scheduleConfirmBtn" style="background:var(--primary);">Sačuvaj</button>
   </div>
 </dialog>
 
@@ -1740,6 +1762,78 @@
     }
   });
 
+  // ── Refresh schedule modal ────────────────────────────────────────────────
+  const scheduleModal     = $('scheduleModal');
+  const schedulePresetSel = $('schedulePresetSelect');
+  const scheduleCronInput = $('scheduleCronInput');
+  const scheduleCronHint  = $('scheduleCronHint');
+  const scheduleNextRun   = $('scheduleNextRun');
+  const scheduleErr       = $('scheduleErr');
+
+  const toggleCustomFields = () => {
+    const isCustom = schedulePresetSel.value === 'custom';
+    scheduleCronInput.style.display = isCustom ? '' : 'none';
+    scheduleCronHint.style.display  = isCustom ? '' : 'none';
+  };
+
+  const renderScheduleForm = (presets, current) => {
+    schedulePresetSel.innerHTML = presets.map(p =>
+      `<option value="${p.id}">${esc(p.label)}</option>`).join('');
+    schedulePresetSel.value = current.preset;
+    toggleCustomFields();
+    scheduleCronInput.value = current.preset === 'custom' ? current.cron : '';
+    scheduleNextRun.textContent = current.nextRun
+      ? `Sledeće osvežavanje: ${new Date(current.nextRun).toLocaleString('sr-RS')}`
+      : '';
+  };
+
+  $('scheduleSettingsBtn').addEventListener('click', async () => {
+    closeMenu();
+    scheduleErr.textContent = '';
+    scheduleModal.showModal();
+    try {
+      const res = await fetch('/api/scheduler/settings');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Greška (${res.status})`);
+      renderScheduleForm(data.presets, data.current);
+    } catch (err) {
+      scheduleErr.textContent = err.message;
+    }
+  });
+
+  schedulePresetSel.addEventListener('change', () => {
+    toggleCustomFields();
+    if (schedulePresetSel.value === 'custom') setTimeout(() => scheduleCronInput.focus(), 50);
+  });
+
+  $('scheduleCancelBtn').addEventListener('click', () => scheduleModal.close());
+
+  $('scheduleConfirmBtn').addEventListener('click', async () => {
+    const preset = schedulePresetSel.value;
+    const cron   = scheduleCronInput.value.trim();
+    if (preset === 'custom' && !cron) {
+      scheduleErr.textContent = 'Unesite cron izraz.';
+      return;
+    }
+    scheduleErr.textContent = '';
+    $('scheduleConfirmBtn').disabled = true;
+    try {
+      const res = await fetch('/api/scheduler/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset, cron: preset === 'custom' ? cron : undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
+      scheduleModal.close();
+      showMsg('success', 'Raspored osvežavanja je sačuvan.');
+    } catch (err) {
+      scheduleErr.textContent = err.message;
+    } finally {
+      $('scheduleConfirmBtn').disabled = false;
+    }
+  });
+
   // ── Submenu (dropdown) ────────────────────────────────────────────────────
   const menuBtn       = $('menuBtn');
   const dropdownPanel = $('dropdownPanel');
@@ -1797,6 +1891,7 @@
     refreshBtn.style.display   = isAdmin ? '' : 'none';
     clearBtn.style.display     = isAdmin ? '' : 'none';
     $('usersLink').style.display = isAdmin ? '' : 'none';
+    $('scheduleSettingsBtn').style.display = isAdmin ? '' : 'none';
     $('dangerSep').style.display = isAdmin ? '' : 'none';
     $('aiFilterPanel').style.display = isAdmin ? '' : 'none';
   };

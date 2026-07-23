@@ -1,28 +1,120 @@
-import { Injectable } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
+import { DatabaseService } from '../database/database.service';
 import { RefreshService } from '../refresh/refresh.service';
 
+export const SCHEDULE_PRESETS = [
+  { id: 'every_6h', label: 'Svakih 6 sati', cron: '0 */6 * * *' },
+  { id: 'every_12h', label: 'Svakih 12 sati (podrazumevano)', cron: '0 0,12 * * *' },
+  { id: 'daily_midnight', label: 'Jednom dnevno u ponoć', cron: '0 0 * * *' },
+  { id: 'custom', label: 'Prilagođeno (cron izraz)', cron: null as string | null },
+];
+
+const DEFAULT_PRESET = 'every_12h';
+const JOB_NAME = 'auto-refresh';
+const TIMEZONE = 'Europe/Belgrade';
+const PRESET_KEY = 'refresh_schedule_preset';
+const CRON_KEY = 'refresh_schedule_cron';
+
 @Injectable()
-export class SchedulerService {
-  constructor(private readonly refreshService: RefreshService) {}
+export class SchedulerService implements OnModuleInit {
+  constructor(
+    private readonly refreshService: RefreshService,
+    private readonly db: DatabaseService,
+    private readonly schedulerRegistry: SchedulerRegistry,
+  ) {}
 
-  @Cron('0 0 * * *', { timeZone: 'Europe/Belgrade' })
-  async midnight() {
-    await this.scheduledRefresh('00:00');
+  async onModuleInit() {
+    const { rows } = await this.db.query('SELECT value FROM meta WHERE key = $1', [CRON_KEY]);
+    const cron = rows[0]?.value || SCHEDULE_PRESETS.find(p => p.id === DEFAULT_PRESET)!.cron!;
+    this.installJob(cron);
   }
 
-  @Cron('0 12 * * *', { timeZone: 'Europe/Belgrade' })
-  async noon() {
-    await this.scheduledRefresh('12:00');
+  getPresets() {
+    return SCHEDULE_PRESETS;
   }
 
-  private async scheduledRefresh(label: string) {
-    console.log(`[scheduler] ${label} — starting refresh`);
+  async getCurrentSchedule() {
+    const { rows } = await this.db.query(
+      'SELECT key, value FROM meta WHERE key IN ($1, $2)',
+      [PRESET_KEY, CRON_KEY],
+    );
+    const values = Object.fromEntries(rows.map(r => [r.key, r.value]));
+    const preset = values[PRESET_KEY] || DEFAULT_PRESET;
+    const cron = values[CRON_KEY] || SCHEDULE_PRESETS.find(p => p.id === DEFAULT_PRESET)!.cron!;
+
+    let nextRun: string | null = null;
+    try {
+      const job = this.schedulerRegistry.getCronJob(JOB_NAME);
+      nextRun = job.nextDate().toISO();
+    } catch {
+      nextRun = null;
+    }
+
+    return { preset, cron, timezone: TIMEZONE, nextRun };
+  }
+
+  async updateSchedule(preset: string, customCron?: string) {
+    if (!preset) {
+      throw new BadRequestException('Nedostaje izabrani raspored.');
+    }
+
+    let cron: string;
+    if (preset === 'custom') {
+      cron = (customCron || '').trim();
+      if (!cron) {
+        throw new BadRequestException('Unesite cron izraz za prilagođeni raspored.');
+      }
+    } else {
+      const found = SCHEDULE_PRESETS.find(p => p.id === preset && p.cron);
+      if (!found) {
+        throw new BadRequestException('Nepoznat raspored.');
+      }
+      cron = found.cron!;
+    }
+
+    this.validateCron(cron);
+
+    await this.db.query(
+      `INSERT INTO meta (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [PRESET_KEY, preset],
+    );
+    await this.db.query(
+      `INSERT INTO meta (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [CRON_KEY, cron],
+    );
+
+    this.installJob(cron);
+
+    return this.getCurrentSchedule();
+  }
+
+  private validateCron(expr: string) {
+    try {
+      new CronJob(expr, () => {}, null, false, TIMEZONE);
+    } catch (err) {
+      throw new BadRequestException(`Neispravan cron izraz: ${err.message}`);
+    }
+  }
+
+  private installJob(cron: string) {
+    if (this.schedulerRegistry.doesExist('cron', JOB_NAME)) {
+      this.schedulerRegistry.deleteCronJob(JOB_NAME);
+    }
+    const job = new CronJob(cron, () => this.scheduledRefresh(), null, true, TIMEZONE);
+    this.schedulerRegistry.addCronJob(JOB_NAME, job);
+  }
+
+  private async scheduledRefresh() {
+    console.log('[scheduler] starting refresh');
     try {
       const { newCount, updatedCount, failedCount } = await this.refreshService.runRefresh();
-      console.log(`[scheduler] ${label} — done: ${newCount} new, ${updatedCount} updated${failedCount ? `, ${failedCount} failed` : ''}`);
+      console.log(`[scheduler] done: ${newCount} new, ${updatedCount} updated${failedCount ? `, ${failedCount} failed` : ''}`);
     } catch (err) {
-      console.error(`[scheduler] ${label} — error:`, err.message);
+      console.error('[scheduler] error:', err.message);
     }
   }
 }
