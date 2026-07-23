@@ -16,7 +16,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 |---|---|
 | Backend | Node.js + NestJS 10 (TypeScript) |
 | Database | PostgreSQL via `pg` (async Pool, raw queries) |
-| Scheduler | `@nestjs/schedule` (Cron) — runs at 00:00 and 12:00 UTC daily |
+| Scheduler | `@nestjs/schedule` (`SchedulerRegistry` + dynamic `CronJob`) — admin-configurable via `/api/scheduler/settings`, applied live without a restart; default twice daily (00:00/12:00 Europe/Belgrade), persisted in `meta` |
 | Frontend | Vanilla HTML/CSS/JS — single file (`index.html`), no build step; client-side hash router + fade transitions emulate a multi-page SPA |
 | AI filter | Google Generative AI SDK — `gemini-2.5-flash` |
 | Deployment | Docker + Docker Compose (multi-stage build) |
@@ -65,7 +65,8 @@ eaukcije/
 │   │   │   └── ai-filter.service.ts
 │   │   ├── scheduler/
 │   │   │   ├── scheduler.module.ts
-│   │   │   └── scheduler.service.ts   # @Cron jobs at 00:00 & 12:00
+│   │   │   ├── scheduler.service.ts   # Dynamic CronJob via SchedulerRegistry; schedule persisted in `meta`
+│   │   │   └── schedule-settings.controller.ts # GET/PUT /api/scheduler/settings, admin-only
 │   │   └── utils/
 │   │       └── utils.ts               # Cyrillic-to-Latin helpers
 │   └── dist/                       # Compiled JS output (gitignored)
@@ -126,7 +127,26 @@ All variables live in `.env` (copy from `.env.example`):
 | `POST` | `/api/favorites/:auctionId` | Logged in | Add an auction to the current user's favorites |
 | `DELETE` | `/api/favorites/:auctionId` | Logged in | Remove an auction from the current user's favorites |
 | `POST` | `/api/refresh` | Admin | Fetch fresh data from eaukcija.sud.rs; streams SSE progress |
+| `GET` | `/api/scheduler/settings` | Admin | Current auto-refresh schedule, available presets, and next scheduled run |
+| `PUT` | `/api/scheduler/settings` | Admin | `{preset, cron?}` — update the auto-refresh schedule; applies live, no restart |
 | `POST` | `/api/ai-filter` | Admin | Natural language filter via Gemini 2.5 Flash |
+
+### `GET` / `PUT /api/scheduler/settings`
+
+`GET` response:
+```json
+{
+  "presets": [
+    { "id": "every_6h", "label": "Svakih 6 sati", "cron": "0 */6 * * *" },
+    { "id": "every_12h", "label": "Svakih 12 sati (podrazumevano)", "cron": "0 0,12 * * *" },
+    { "id": "daily_midnight", "label": "Jednom dnevno u ponoć", "cron": "0 0 * * *" },
+    { "id": "custom", "label": "Prilagođeno (cron izraz)", "cron": null }
+  ],
+  "current": { "preset": "every_12h", "cron": "0 0,12 * * *", "timezone": "Europe/Belgrade", "nextRun": "2026-07-23T12:00:00+02:00" }
+}
+```
+
+`PUT` request body — either `{ "preset": "every_6h" }` or, for a custom schedule, `{ "preset": "custom", "cron": "*/30 * * * *" }`. Response mirrors `current` above. Invalid preset id / missing custom cron / unparseable cron expression → `400`. The schedule is stored in `meta` (`refresh_schedule_preset`, `refresh_schedule_cron`) and applied immediately via `SchedulerRegistry` — no server restart needed, and it persists across restarts.
 
 ### `POST /api/ai-filter`
 
@@ -169,7 +189,7 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 | `raw_data` | TEXT | Full JSON blob; excluded from `/api/auctions` response |
 | `added_at` | TIMESTAMPTZ | `NOW()` at insert |
 
-**`meta`** — key/value store; currently only `last_refresh` (ISO 8601 string).
+**`meta`** — key/value store: `last_refresh` (ISO 8601 string), `refresh_schedule_preset` (preset id, see `SCHEDULE_PRESETS` in `scheduler.service.ts`), `refresh_schedule_cron` (the resolved cron expression currently installed for the auto-refresh job).
 
 **`favorites`**
 
@@ -208,7 +228,9 @@ Composite primary key `(user_id, auction_id)` — one row per user/auction favor
 
 **Router:** `targetViewFromHash()` maps `location.hash` (`''`/`#/` → `app`, `#/admin` → `admin`) to a view; non-admins requesting `#/admin` are bounced back to `#/`. `routerImpl()` diffs the requested target against `currentScreen` and crossfades between screens/views via `fadeSwap()` (opacity transition, same visual language as the initial `#appLoader`). Router calls are serialized through a `routerQueue` promise chain — `fadeSwap` takes ~440ms, so two navigation events fired in quick succession (e.g. "home" then "logout") would otherwise run two `routerImpl()` invocations concurrently and corrupt `currentScreen`/DOM state; the queue forces them to run one after another. Always trigger navigation by calling `router()` (or changing `location.hash`, which fires it via the `hashchange` listener) — never call `routerImpl()` directly.
 
-**Header submenu:** Osveži, Korisnici, Promeni lozinku, Obriši bazu, and Odjava are collapsed into a single dropdown (`#dropdownPanel`) opened from `#menuBtn` in the top-right corner, instead of separate header buttons. `applyRoleUI()` hides the admin-only items (`#refreshBtn`, `#clearBtn`, `#usersLink`, `#dangerSep`, `#aiFilterPanel`) unless `role === 'admin'`.
+**Header submenu:** Osveži, Korisnici, Podešavanja osvežavanja, Promeni lozinku, Obriši bazu, and Odjava are collapsed into a single dropdown (`#dropdownPanel`) opened from `#menuBtn` in the top-right corner, instead of separate header buttons. `applyRoleUI()` hides the admin-only items (`#refreshBtn`, `#clearBtn`, `#usersLink`, `#scheduleSettingsBtn`, `#dangerSep`, `#aiFilterPanel`) unless `role === 'admin'`.
+
+**Auto-refresh schedule modal:** `#scheduleSettingsBtn` (admin only) opens `#scheduleModal`, a `<dialog>` following the same pattern as the change-password modal. On open it fetches `GET /api/scheduler/settings`, populates a preset `<select>` and shows the next scheduled run time; picking "Prilagođeno (cron izraz)" reveals a raw cron text input. Saving calls `PUT /api/scheduler/settings`, which applies the new schedule to the running cron job immediately (no restart) and persists it in `meta`.
 
 **Auth:** On load, `GET /api/auth/me` determines `currentUser`; failure/401 shows `#loginScreen` instead of the shell (no redirect — same page, same URL). The login form posts to `/api/auth/login` and hands off to the router on success. Logout clears local state and routes back to `#loginScreen`.
 
