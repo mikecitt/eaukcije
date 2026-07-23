@@ -261,7 +261,7 @@ Composite primary key `(user_id, auction_id)` — one row per user/auction favor
 
 **Cyrillic handling:** All text is stored as Cyrillic in the DB. `transformAuction()` converts every text field to Serbian Latin at load time using `cyrToLat()`. Search also strips diacritics via `stripDiacritics()` so e.g. `"kuca"` matches `"kuća"`.
 
-**Refresh via SSE:** `POST /api/refresh` returns a stream of `data: {...}\n\n` events with types `status`, `progress`, `done`, `error`.
+**Refresh via SSE:** `POST /api/refresh` returns a stream of `data: {...}\n\n` events with types `status`, `progress`, `done`, `error`. `RefreshService.runRefresh()` splits the fetched list into new vs. already-known IDs: existing auctions are updated in place (`auction_number`, `short_description`, `status`/`status_translation`, `starting_price`, `start_date`, `end_date`, `property_type`, `is_first_sale`, and `raw_data.auction`) so status/price changes on known auctions are picked up on every refresh, while `place_name`/`place_municipality`/`details_fetched`/`raw_data.details` are left untouched (no repeat detail fetch); new auctions get a full detail fetch and insert as before.
 
 ---
 

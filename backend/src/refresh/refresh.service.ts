@@ -15,8 +15,9 @@ export class RefreshService {
     const apiAuctions = await this.eaukcija.fetchAllAuctions();
     onProgress(`Pronađeno ${apiAuctions.length} aukcija. Provjera novih...`, 5);
 
-    const { rows: existingRows } = await this.db.query('SELECT id FROM auctions');
-    const existingIds = new Set(existingRows.map(r => r.id));
+    const { rows: existingRows } = await this.db.query('SELECT id, raw_data FROM auctions');
+    const existingIds     = new Set(existingRows.map(r => r.id));
+    const existingRawData = new Map(existingRows.map(r => [r.id, r.raw_data]));
 
     const newAuctions      = apiAuctions.filter(a => !existingIds.has(String(a.Id)));
     const existingAuctions = apiAuctions.filter(a =>  existingIds.has(String(a.Id)));
@@ -27,11 +28,35 @@ export class RefreshService {
     try {
       await client.query('BEGIN');
       for (const a of existingAuctions) {
+        const id = String(a.Id);
+
+        let raw;
+        try {
+          raw = JSON.parse(existingRawData.get(id) || '{}');
+        } catch {
+          raw = {};
+        }
+        raw.auction = a;
+
         await client.query(
           `UPDATE auctions
-           SET status = $1, status_translation = $2, starting_price = $3, start_date = $4, end_date = $5
-           WHERE id = $6`,
-          [a.Status || '', a.StatusTranslation || '', a.StartingPrice, a.StartDate, a.EndDate, String(a.Id)],
+           SET auction_number = $1, short_description = $2, status = $3, status_translation = $4,
+               starting_price = $5, start_date = $6, end_date = $7, property_type = $8,
+               is_first_sale = $9, raw_data = $10
+           WHERE id = $11`,
+          [
+            a.AuctionNumber     || '',
+            a.ShortDescription  || '',
+            a.Status            || '',
+            a.StatusTranslation || '',
+            a.StartingPrice     || 0,
+            a.StartDate         || '',
+            a.EndDate           || '',
+            a.PropertyType      || '',
+            a.IsFirstSale ? 1 : 0,
+            JSON.stringify(raw),
+            id,
+          ],
         );
       }
       await client.query('COMMIT');
