@@ -1793,8 +1793,8 @@
     scheduleModal.showModal();
     try {
       const res = await fetch('/api/scheduler/settings');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Greška (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `Greška (${res.status})`);
       renderScheduleForm(data.presets, data.current);
     } catch (err) {
       scheduleErr.textContent = err.message;

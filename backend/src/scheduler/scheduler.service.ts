@@ -19,6 +19,8 @@ const CRON_KEY = 'refresh_schedule_cron';
 
 @Injectable()
 export class SchedulerService implements OnModuleInit {
+  private refreshInProgress = false;
+
   constructor(
     private readonly refreshService: RefreshService,
     private readonly db: DatabaseService,
@@ -47,8 +49,12 @@ export class SchedulerService implements OnModuleInit {
       [PRESET_KEY, CRON_KEY],
     );
     const values = Object.fromEntries(rows.map(r => [r.key, r.value]));
-    const preset = values[PRESET_KEY] || DEFAULT_PRESET;
-    const cron = values[CRON_KEY] || SCHEDULE_PRESETS.find(p => p.id === DEFAULT_PRESET)!.cron!;
+    const defaultCron = SCHEDULE_PRESETS.find(p => p.id === DEFAULT_PRESET)!.cron!;
+    const matchedPreset = SCHEDULE_PRESETS.find(p => p.id === values[PRESET_KEY]);
+    const preset = matchedPreset?.id ?? DEFAULT_PRESET;
+    const cron = preset === 'custom'
+      ? values[CRON_KEY] || defaultCron
+      : matchedPreset?.cron ?? defaultCron;
 
     let nextRun: string | null = null;
     try {
@@ -110,17 +116,24 @@ export class SchedulerService implements OnModuleInit {
     if (this.schedulerRegistry.doesExist('cron', JOB_NAME)) {
       this.schedulerRegistry.deleteCronJob(JOB_NAME);
     }
-    const job = new CronJob(cron, () => this.scheduledRefresh(), null, true, TIMEZONE);
+    const job = new CronJob(cron, () => { void this.scheduledRefresh(); }, null, true, TIMEZONE);
     this.schedulerRegistry.addCronJob(JOB_NAME, job);
   }
 
   private async scheduledRefresh() {
+    if (this.refreshInProgress) {
+      console.log('[scheduler] skipping tick — previous refresh still in progress');
+      return;
+    }
+    this.refreshInProgress = true;
     console.log('[scheduler] starting refresh');
     try {
       const { newCount, updatedCount, failedCount } = await this.refreshService.runRefresh();
       console.log(`[scheduler] done: ${newCount} new, ${updatedCount} updated${failedCount ? `, ${failedCount} failed` : ''}`);
     } catch (err) {
       console.error('[scheduler] error:', err.message);
+    } finally {
+      this.refreshInProgress = false;
     }
   }
 }
