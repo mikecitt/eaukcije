@@ -975,7 +975,7 @@
               <th class="sortable" data-col="auction_number">Br. aukcije <i class="sort-arrow">↕</i></th>
               <th>Opis</th>
               <th class="sortable" data-col="place_name">Mesto <i class="sort-arrow">↕</i></th>
-              <th class="sortable" data-col="status_translation">Status <i class="sort-arrow">↕</i></th>
+              <th class="sortable" data-col="status">Status <i class="sort-arrow">↕</i></th>
               <th class="sortable" data-col="starting_price">Poc. cena <i class="sort-arrow">↕</i></th>
               <th class="sortable" data-col="start_date">Pocetak <i class="sort-arrow">↕</i></th>
               <th class="sortable" data-col="end_date">Kraj <i class="sort-arrow">↕</i></th>
@@ -1161,13 +1161,13 @@
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   const statusBadge = (status, translation) => {
-    const t = stripDiacritics(cyrToLat(translation || status || '').toLowerCase());
+    const t = stripDiacritics(cyrToLat(status || translation || '').toLowerCase());
     let cls = 'badge-default';
     if (t.includes('potvrđ') || t.includes('potvrd') || t.includes('aktiv')) cls = 'badge-verified';
     else if (t.includes('otkaz') || t.includes('cancel')) cls = 'badge-cancelled';
     else if (t.includes('zavrs') || t.includes('complet')) cls = 'badge-completed';
     else if (t.includes('ceka') || t.includes('pending') || t.includes('objavlj')) cls = 'badge-unverified';
-    return `<span class="badge ${cls}">${esc(cyrToLat(translation || status || '—'))}</span>`;
+    return `<span class="badge ${cls}">${esc(cyrToLat(status || translation || '—'))}</span>`;
   };
 
   // ── Sorting ────────────────────────────────────────────────────────────────
@@ -1225,7 +1225,7 @@
 
   const populateStatusFilter = data => {
     const current = fStatus.value;
-    const statuses = [...new Set(data.map(a => a.status_translation || a.status || '').filter(Boolean))].sort((a, b) => a.localeCompare(b, 'sr'));
+    const statuses = [...new Set(data.map(a => a.status || a.status_translation || '').filter(Boolean))].sort((a, b) => a.localeCompare(b, 'sr'));
     fStatus.innerHTML = '<option value="">Svi statusi</option>';
     statuses.forEach(s => {
       const o = document.createElement('option');
