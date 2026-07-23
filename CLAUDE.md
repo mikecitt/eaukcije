@@ -17,7 +17,7 @@ A full-stack web app that tracks Serbian court auctions of real estate from `eau
 | Backend | Node.js + NestJS 10 (TypeScript) |
 | Database | PostgreSQL via `pg` (async Pool, raw queries) |
 | Scheduler | `@nestjs/schedule` (`SchedulerRegistry` + dynamic `CronJob`) — admin-configurable via `/api/scheduler/settings`, applied live without a restart; default twice daily (00:00/12:00 Europe/Belgrade), persisted in `meta` |
-| Frontend | Vanilla HTML/CSS/JS — single file (`index.html`), no build step; client-side hash router + fade transitions emulate a multi-page SPA |
+| Frontend | React 18 + TypeScript, built with Vite; `react-router-dom` `HashRouter` for client-side routing (`/`, `/admin`) |
 | AI filter | Google Generative AI SDK — `gemini-2.5-flash` |
 | Deployment | Docker + Docker Compose (multi-stage build) |
 
@@ -70,9 +70,29 @@ eaukcije/
 │   │   └── utils/
 │   │       └── utils.ts               # Cyrillic-to-Latin helpers
 │   └── dist/                       # Compiled JS output (gitignored)
-├── frontend/
-│   └── index.html                  # Entire app (vanilla JS): login screen, main auctions view,
-│                                    # and admin/user-management view, switched via hash router
+├── frontend/                       # React + TypeScript SPA, built with Vite (own package.json)
+│   ├── index.html                  # Vite entry HTML (mounts #root)
+│   ├── vite.config.ts              # Dev server proxies /api and /health to :3000; build → frontend/dist
+│   ├── dist/                       # Production build output (gitignored) — served by NestJS ServeStaticModule
+│   └── src/
+│       ├── main.tsx                 # ReactDOM root, HashRouter + AuthProvider
+│       ├── App.tsx                  # App loader → LoginScreen or Shell, based on auth state
+│       ├── api.ts                   # fetch wrappers for every backend endpoint
+│       ├── types.ts                 # Auction / UserAccount / ScheduleSettings / RefreshEvent types
+│       ├── utils.ts                 # Cyrillic-to-Latin, diacritic stripping, date/price formatting
+│       ├── filtering.ts             # Pure applyFilters/sortData/withFavoritesFirst helpers
+│       ├── styles.css               # Global stylesheet (ported 1:1 from the old single-file app)
+│       ├── context/
+│       │   ├── AuthContext.tsx          # currentUser, login/logout, GET /api/auth/me on mount
+│       │   ├── MessageContext.tsx       # top-of-page alert banner (error/success/info)
+│       │   └── AuctionsDataContext.tsx  # allAuctions/favoriteIds/lastRefresh + SSE refresh + clear-db
+│       └── components/
+│           ├── AppLoader.tsx, LoginScreen.tsx, Shell.tsx, Header.tsx
+│           ├── AuctionsView.tsx, StatsRow.tsx, ProgressBar.tsx, FiltersPanel.tsx,
+│           │   AiFilterPanel.tsx, AuctionsTable.tsx, Pagination.tsx
+│           ├── AdminView.tsx               # user management (create/list/delete)
+│           └── Modal.tsx, DeleteDbModal.tsx, ChangePasswordModal.tsx,
+│               ScheduleModal.tsx, DeleteUserModal.tsx
 ├── package.json
 ├── tsconfig.json
 ├── docker-compose.yml
@@ -215,53 +235,48 @@ Composite primary key `(user_id, auction_id)` — one row per user/auction favor
 
 ## Frontend architecture
 
-`frontend/index.html` is a single self-contained file with no build tooling — one inline `<style>`/`<script>`. It behaves like a 3-page SPA (login / auctions / user management) via a small hand-rolled hash router instead of separate HTML files, so navigation never triggers a full page reload.
+`frontend/` is a React 18 + TypeScript single-page app built with Vite (its own `package.json`, separate from the root one). In production, the compiled static bundle (`frontend/dist/`) is served by NestJS's `ServeStaticModule` from the same origin as the API — there is no separate frontend server in production. In development, run `npm run dev:frontend` (Vite dev server, default port 5173) alongside `npm run dev` (backend on `:3000`); `vite.config.ts` proxies `/api` and `/health` to `:3000` so the app works identically to production.
 
-**Screens** (top-level DOM containers, mutually exclusive):
+**Screens** (mutually exclusive, driven by React state/routes, not manual DOM show/hide):
 
-| Element | Shown when |
+| Component | Shown when |
 |---|---|
-| `#loginScreen` | No valid session (`currentUser === null`) |
-| `#shell` | Logged in — contains the header + one of the two views below |
-| `#shell > #viewApp` | Main auctions table/filters/AI panel (route `#/`) |
-| `#shell > #viewAdmin` | User management, admin only (route `#/admin`) |
+| `AppLoader` | Always mounted first; fades out once the initial `GET /api/auth/me` check resolves |
+| `LoginScreen` | No valid session (`currentUser === null`) |
+| `Shell` | Logged in — renders `Header` + the routed view below |
+| `Shell` → `AuctionsView` | Main auctions table/filters/AI panel, route `/` (`#/`) |
+| `Shell` → `AdminView` | User management, admin only, route `/admin` (`#/admin`) |
 
-**Router:** `targetViewFromHash()` maps `location.hash` (`''`/`#/` → `app`, `#/admin` → `admin`) to a view; non-admins requesting `#/admin` are bounced back to `#/`. `routerImpl()` diffs the requested target against `currentScreen` and crossfades between screens/views via `fadeSwap()` (opacity transition, same visual language as the initial `#appLoader`). Router calls are serialized through a `routerQueue` promise chain — `fadeSwap` takes ~440ms, so two navigation events fired in quick succession (e.g. "home" then "logout") would otherwise run two `routerImpl()` invocations concurrently and corrupt `currentScreen`/DOM state; the queue forces them to run one after another. Always trigger navigation by calling `router()` (or changing `location.hash`, which fires it via the `hashchange` listener) — never call `routerImpl()` directly.
+**Router:** `react-router-dom`'s `HashRouter` (mounted in `main.tsx`) provides `/` and `/admin` routes; `Shell.tsx` redirects `/admin` back to `/` for non-admin users via `<Navigate>`. There's no manual fade-transition queue anymore — React's own reconciliation handles view swaps.
 
-**Header submenu:** Osveži, Korisnici, Podešavanja osvežavanja, Promeni lozinku, Obriši bazu, and Odjava are collapsed into a single dropdown (`#dropdownPanel`) opened from `#menuBtn` in the top-right corner, instead of separate header buttons. `applyRoleUI()` hides the admin-only items (`#refreshBtn`, `#clearBtn`, `#usersLink`, `#scheduleSettingsBtn`, `#dangerSep`, `#aiFilterPanel`) unless `role === 'admin'`.
+**State management — React Context, no global mutable variables:**
 
-**Auto-refresh schedule modal:** `#scheduleSettingsBtn` (admin only) opens `#scheduleModal`, a `<dialog>` following the same pattern as the change-password modal. On open it fetches `GET /api/scheduler/settings`, populates a preset `<select>` and shows the next scheduled run time; picking "Prilagođeno (cron izraz)" reveals a raw cron text input. Saving calls `PUT /api/scheduler/settings`, which applies the new schedule to the running cron job immediately (no restart) and persists it in `meta`.
-
-**Auth:** On load, `GET /api/auth/me` determines `currentUser`; failure/401 shows `#loginScreen` instead of the shell (no redirect — same page, same URL). The login form posts to `/api/auth/login` and hands off to the router on success. Logout clears local state and routes back to `#loginScreen`.
-
-**Key state variables:**
-
-| Variable | Description |
+| Context | Provides |
 |---|---|
-| `allAuctions` | Full dataset loaded from `/api/auctions` |
-| `filteredAuctions` | Result of `applyFilters` + `sortData` |
-| `aiMatchIds` | `null` when AI filter inactive; `Set<id>` when active |
-| `sortCol` / `sortDir` | Current sort state |
-| `page` / `perPage` | Pagination state |
-| `busy` | Prevents concurrent refresh requests |
-| `aiBusy` | Prevents concurrent AI filter requests |
-| `currentUser` | `{username, role}` for the logged-in session, or `null` |
-| `currentScreen` | `'login' \| 'app' \| 'admin'` — screen the router last settled on |
-| `auctionsLoaded` | Guards against re-fetching `/api/auctions` every time the app view is re-entered |
-| `favoriteIds` | `Set<id>` of the current user's favorited auction IDs, loaded from `/api/favorites` alongside `/api/auctions` |
+| `AuthContext` | `currentUser`, `loading`, `login()`, `logout()` — resolves `GET /api/auth/me` once on mount |
+| `MessageContext` | Top-of-page alert banner (`error`/`success`/`info`), auto-dismissed after 8s except errors |
+| `AuctionsDataContext` | `allAuctions`, `favoriteIds`, `lastRefresh`, `loaded`/`ensureLoaded()` (lazy first load, mirrors the old `auctionsLoaded` guard), `toggleFavorite()`, `clearDatabase()`, and the refresh SSE state/`doRefresh()` — mounted once per login session so `Header`'s refresh/clear-db actions and `AuctionsView`'s table share the same data regardless of which route is active |
 
-**Filter pipeline** (`applyFilters → sortData → withFavoritesFirst → renderTable`):
+Per-view UI state (search text, sort column/direction, pagination, AI filter query) lives as local `useState` inside `AuctionsView`/`AdminView`, not in a context — it doesn't need to survive a route change since it's re-derived on mount.
 
-1. `applyFilters(allAuctions)` — applies text search, status, first sale, price range, show-finished toggle, and `aiMatchIds` set
+**Header submenu:** Osveži, Korisnici, Podešavanja osvežavanja, Promeni lozinku, Obriši bazu, and Odjava are collapsed into a single dropdown in `Header.tsx`, closed on outside click/Escape/item click. Admin-only items are conditionally rendered (not just hidden) based on `currentUser.role === 'admin'`.
+
+**Modals:** `Modal.tsx` is a thin wrapper around the native `<dialog>` element (`showModal()`/`close()` via a ref + `useEffect`) used by `DeleteDbModal`, `ChangePasswordModal`, `ScheduleModal`, and `DeleteUserModal`. Each modal owns its own form state and is only mounted while open (conditional render), so no reset-on-close logic is needed.
+
+**Auto-refresh schedule modal:** `ScheduleModal` fetches `GET /api/scheduler/settings` on mount, renders a preset `<select>` and next-scheduled-run time; picking "Prilagođeno (cron izraz)" reveals a raw cron text input. Saving calls `PUT /api/scheduler/settings`.
+
+**Filter pipeline** (`src/filtering.ts`, pure functions, memoized in `AuctionsView` via `useMemo`):
+
+1. `applyFilters(allAuctions, filterState)` — text search, status, first sale, price range, show-finished toggle, and `aiMatchIds` set
 2. `sortData(...)` — stable sort on the chosen column
 3. `withFavoritesFirst(...)` — partitions the sorted result so favorited auctions (per `favoriteIds`) float to the front, each group keeping the chosen sort order internally
-4. `renderTable()` — slices for current page and writes HTML; inserts a "★ Favoriti" / "Sve aukcije" group-header row where the favorite/non-favorite groups meet within the visible page
+4. `AuctionsTable` slices for the current page and renders rows, inserting a "★ Favoriti" / "Sve aukcije" group-header row where the favorite/non-favorite groups meet within the visible page
 
-**Favorites UI:** Each row has a star toggle button (leftmost column) that calls `toggleFavorite(id)` — optimistically flips `favoriteIds` and re-renders, then confirms with `POST`/`DELETE /api/favorites/:id`, reverting on failure. Favorited rows get a highlighted background (`.fav-row`).
+**Favorites UI:** Each row has a star toggle button (leftmost column) that calls `toggleFavorite(id)` from `AuctionsDataContext` — optimistically flips `favoriteIds` and re-renders, then confirms with `POST`/`DELETE /api/favorites/:id`, reverting on failure. Favorited rows get a highlighted background (`.fav-row`).
 
-**Cyrillic handling:** All text is stored as Cyrillic in the DB. `transformAuction()` converts every text field to Serbian Latin at load time using `cyrToLat()`. Search also strips diacritics via `stripDiacritics()` so e.g. `"kuca"` matches `"kuća"`.
+**Cyrillic handling:** All text is stored as Cyrillic in the DB. `transformAuction()` (`utils.ts`) converts every text field to Serbian Latin at load time using `cyrToLat()`. Search also strips diacritics via `stripDiacritics()` so e.g. `"kuca"` matches `"kuća"`.
 
-**Refresh via SSE:** `POST /api/refresh` returns a stream of `data: {...}\n\n` events with types `status`, `progress`, `done`, `error`.
+**Refresh via SSE:** `AuctionsDataContext.doRefresh()` calls `POST /api/refresh` and reads the response body as a stream of `data: {...}\n\n` events with types `status`, `progress`, `done`, `error`, updating progress-bar state as they arrive.
 
 ---
 
@@ -272,11 +287,13 @@ cp .env.example .env
 # Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, DATABASE_URL, JWT_SECRET
 
 npm install
-npm run dev        # ts-node backend/src/main.ts
-# open http://localhost:3000 — log in as admin / ProxmoxGuru123, then change the password
+npm run dev             # backend: ts-node backend/src/main.ts (port 3000)
+npm run dev:frontend    # in a second terminal: Vite dev server (proxies /api to :3000)
+# open the Vite dev server URL it prints (default http://localhost:5173)
+# log in as admin / ProxmoxGuru123, then change the password
 ```
 
-A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configure.
+A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configure. To exercise the production setup (single origin, no Vite dev server), run `npm run build` then `npm start` and open `http://localhost:3000` directly.
 
 ## Running with Docker
 
@@ -292,9 +309,21 @@ docker compose up --build
 ## Building for production
 
 ```bash
-npm run build      # tsc → backend/dist/
+npm run build       # tsc → backend/dist/, then builds frontend/dist/ (Vite)
 node backend/dist/main.js
 ```
+
+`npm run build` runs `build:backend` (`tsc`) and `build:frontend` (`npm --prefix frontend install && npm --prefix frontend run build`); the compiled server serves the static React bundle from `frontend/dist/` via `ServeStaticModule` (see `backend/src/app.module.ts`).
+
+---
+
+## Testing
+
+```bash
+npm test
+```
+
+`test/app.test.js` boots the real `AppModule` via `@nestjs/testing`, logs in as the seeded default admin, and exercises the actual guarded routes (`GET /health`, auth guard 401s, `/api/auctions`, `/api/favorites`, `/api/ai-filter` validation, `DELETE /api/auctions` password checks) with `supertest`. It requires the `DATABASE_URL` in `.env`/the environment to be reachable; if it isn't, every test calls `t.skip()` at run time (checked dynamically, not via node:test's static `skip` option, since that's evaluated before the async DB-connectivity check in `before()` can resolve) and the run reports skipped rather than failed.
 
 ---
 

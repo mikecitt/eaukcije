@@ -19,7 +19,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', '..', 'frontend'),
+      rootPath: join(__dirname, '..', '..', 'frontend', 'dist'),
       exclude: ['/api/(.*)'],
     }),
     DatabaseModule,
