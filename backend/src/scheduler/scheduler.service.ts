@@ -17,9 +17,12 @@ const TIMEZONE = 'Europe/Belgrade';
 const PRESET_KEY = 'refresh_schedule_preset';
 const CRON_KEY = 'refresh_schedule_cron';
 
+const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
 @Injectable()
 export class SchedulerService implements OnModuleInit {
   private refreshInProgress = false;
+  private updateChain: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly refreshService: RefreshService,
@@ -34,7 +37,7 @@ export class SchedulerService implements OnModuleInit {
     try {
       this.installJob(cron);
     } catch (err) {
-      console.error(`[scheduler] Invalid persisted cron "${cron}" (${err.message}); falling back to default schedule.`);
+      console.error(`[scheduler] Invalid persisted cron "${cron}" (${errorMessage(err)}); falling back to default schedule.`);
       this.installJob(fallback);
     }
   }
@@ -68,13 +71,21 @@ export class SchedulerService implements OnModuleInit {
   }
 
   async updateSchedule(preset: string, customCron?: string) {
+    // Serialize concurrent PUTs so two overlapping requests can't interleave
+    // their meta writes / job installs into an inconsistent combination.
+    const run = this.updateChain.catch(() => {}).then(() => this.doUpdateSchedule(preset, customCron));
+    this.updateChain = run.catch(() => {});
+    return run;
+  }
+
+  private async doUpdateSchedule(preset: string, customCron?: string) {
     if (!preset) {
       throw new BadRequestException('Nedostaje izabrani raspored.');
     }
 
     let cron: string;
     if (preset === 'custom') {
-      cron = (customCron || '').trim();
+      cron = (typeof customCron === 'string' ? customCron : '').trim();
       if (!cron) {
         throw new BadRequestException('Unesite cron izraz za prilagođeni raspored.');
       }
@@ -106,9 +117,10 @@ export class SchedulerService implements OnModuleInit {
 
   private validateCron(expr: string) {
     try {
-      new CronJob(expr, () => {}, null, false, TIMEZONE);
+      const job = new CronJob(expr, () => {}, null, false, TIMEZONE);
+      job.nextDate(); // force computing a next occurrence so an unsatisfiable pattern fails validation, not job install
     } catch (err) {
-      throw new BadRequestException(`Neispravan cron izraz: ${err.message}`);
+      throw new BadRequestException(`Neispravan cron izraz: ${errorMessage(err)}`);
     }
   }
 
@@ -131,7 +143,7 @@ export class SchedulerService implements OnModuleInit {
       const { newCount, updatedCount, failedCount } = await this.refreshService.runRefresh();
       console.log(`[scheduler] done: ${newCount} new, ${updatedCount} updated${failedCount ? `, ${failedCount} failed` : ''}`);
     } catch (err) {
-      console.error('[scheduler] error:', err.message);
+      console.error('[scheduler] error:', errorMessage(err));
     } finally {
       this.refreshInProgress = false;
     }
