@@ -186,6 +186,7 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
           reload();
           break;
         case 'error':
+          setProgressText(`Greška: ${ev.message}`);
           showMsg('error', `Greška: ${ev.message}`);
           break;
       }
