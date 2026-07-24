@@ -14,7 +14,7 @@ function fmtLastRefresh(ts: string | null): string {
 
 export default function Header() {
   const { currentUser, logout } = useAuth();
-  const { lastRefresh, refreshBusy, doRefresh, resetAfterLogout } = useAuctionsData();
+  const { lastRefresh, refreshBusy, doRefresh } = useAuctionsData();
   const navigate = useNavigate();
   const location = useLocation();
   const isAdmin = currentUser?.role === 'admin';
@@ -44,7 +44,6 @@ export default function Header() {
   const handleLogout = async () => {
     closeMenu();
     await logout();
-    resetAfterLogout();
     navigate('/');
   };
 

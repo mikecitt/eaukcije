@@ -72,7 +72,7 @@ export default function ScheduleModal({ onClose }: { onClose: () => void }) {
       <div className="modal-err">{err}</div>
       <div className="modal-actions">
         <button className="btn btn-modal-cancel" onClick={onClose}>Odustani</button>
-        <button className="btn btn-modal-confirm" style={{ background: 'var(--primary)' }} disabled={busy} onClick={submit}>Sačuvaj</button>
+        <button className="btn btn-modal-confirm" style={{ background: 'var(--primary)' }} disabled={busy || !preset} onClick={submit}>Sačuvaj</button>
       </div>
     </Modal>
   );

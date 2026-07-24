@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import type { Auction, RefreshEvent } from '../types';
 import { transformAuction } from '../utils';
@@ -13,7 +13,6 @@ interface AuctionsDataContextValue {
   reload: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   clearDatabase: (password: string) => Promise<void>;
-  resetAfterLogout: () => void;
 
   refreshBusy: boolean;
   showProgress: boolean;
@@ -89,11 +88,11 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
     showMsg('info', 'Baza je obrisana.');
   }, [showMsg]);
 
-  const resetAfterLogout = useCallback(() => {
-    setAllAuctions([]);
-    setFavoriteIds(new Set());
-    setLastRefresh(null);
-    setLoaded(false);
+  // No manual logout reset needed: App only mounts this provider while
+  // currentUser is set, so logging out unmounts it and a fresh instance
+  // (with fresh useState) mounts on the next login.
+  useEffect(() => () => {
+    if (hideProgressTimer.current) clearTimeout(hideProgressTimer.current);
   }, []);
 
   const doRefresh = useCallback(async () => {
@@ -166,7 +165,7 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
   return (
     <AuctionsDataContext.Provider value={{
       allAuctions, favoriteIds, lastRefresh, loaded, ensureLoaded, reload,
-      toggleFavorite, clearDatabase, resetAfterLogout,
+      toggleFavorite, clearDatabase,
       refreshBusy, showProgress, progressText, progressPercent, doRefresh,
     }}>
       {children}

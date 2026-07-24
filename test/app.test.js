@@ -7,6 +7,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-app-tests';
 process.env.DB_REMOVE_PASSWORD = process.env.DB_REMOVE_PASSWORD || 'test-remove-password';
 process.env.ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || 'test-admin-password';
 
+const { Pool } = require('pg');
 const { Test } = require('@nestjs/testing');
 const cookieParser = require('cookie-parser');
 const { AppModule } = require('../backend/src/app.module');
@@ -25,24 +26,32 @@ function skipIfNoDb(t) {
 }
 
 before(async () => {
+  // Probe DB reachability on its own first, so a real regression in app
+  // bootstrap/login below isn't swallowed and reported as "DB unavailable".
+  const probe = new Pool({ connectionString: process.env.DATABASE_URL });
   try {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.use(cookieParser());
-    await app.init();
-    server = app.getHttpServer();
-
-    adminAgent = request.agent(server);
-    const res = await adminAgent
-      .post('/api/auth/login')
-      .send({ username: 'admin', password: process.env.ADMIN_DEFAULT_PASSWORD });
-    if (res.status !== 200) {
-      throw new Error(`seeded admin login failed with status ${res.status}`);
-    }
-    dbAvailable = true;
+    await probe.query('SELECT 1');
   } catch (err) {
     console.log(`# PostgreSQL not available — DB tests will be skipped (${err.message})`);
+    return;
+  } finally {
+    await probe.end();
   }
+
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  app = moduleRef.createNestApplication();
+  app.use(cookieParser());
+  await app.init();
+  server = app.getHttpServer();
+
+  adminAgent = request.agent(server);
+  const res = await adminAgent
+    .post('/api/auth/login')
+    .send({ username: 'admin', password: process.env.ADMIN_DEFAULT_PASSWORD });
+  if (res.status !== 200) {
+    throw new Error(`seeded admin login failed with status ${res.status}`);
+  }
+  dbAvailable = true;
 });
 
 after(async () => {
