@@ -21,7 +21,7 @@ interface AuctionsDataContextValue {
   showProgress: boolean;
   progressText: string;
   progressPercent: number;
-  doRefresh: () => Promise<void>;
+  doRefresh: (excludedStatuses?: string[]) => Promise<void>;
 }
 
 const AuctionsDataContext = createContext<AuctionsDataContextValue | null>(null);
@@ -117,7 +117,7 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
     if (hideProgressTimer.current) clearTimeout(hideProgressTimer.current);
   }, []);
 
-  const doRefresh = useCallback(async () => {
+  const doRefresh = useCallback(async (excludedStatuses: string[] = []) => {
     if (refreshBusy) return;
     setRefreshBusy(true);
     setShowProgress(true);
@@ -127,7 +127,11 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
     if (hideProgressTimer.current) clearTimeout(hideProgressTimer.current);
 
     try {
-      const res = await fetch('/api/refresh', { method: 'POST' });
+      const res = await fetch('/api/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ excludedStatuses }),
+      });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
       const reader = res.body.getReader();
@@ -173,6 +177,7 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
           setLastRefresh(ev.lastRefresh);
           showMsg('success',
             `Osvežavanje završeno: ${ev.newCount} novih, ${ev.updatedCount} ažuriranih` +
+            (ev.skippedCount ? `, ${ev.skippedCount} preskočeno` : '') +
             (ev.failedCount ? `, ${ev.failedCount} neuspelih` : '')
           );
           reload();
