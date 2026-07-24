@@ -31,7 +31,7 @@ export class RefreshService {
           `UPDATE auctions
            SET status = $1, status_translation = $2, starting_price = $3, current_price = $4, start_date = $5, end_date = $6
            WHERE id = $7`,
-          [a.Status || '', a.StatusTranslation || '', a.StartingPrice, a.CurrentPrice, a.StartDate, a.EndDate, String(a.Id)],
+          [a.Status || '', a.StatusTranslation || '', a.StartingPrice, a.CurrentPrice ?? null, a.StartDate, a.EndDate, String(a.Id)],
         );
       }
       await client.query('COMMIT');
@@ -73,7 +73,7 @@ export class RefreshService {
           a.Status               || '',
           a.StatusTranslation    || '',
           a.StartingPrice        || 0,
-          a.CurrentPrice,
+          a.CurrentPrice          ?? null,
           a.StartDate            || '',
           a.EndDate              || '',
           a.PropertyType         || '',

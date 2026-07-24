@@ -49,9 +49,18 @@ export type SortCol = keyof Auction;
 
 export function sortData(data: Auction[], sortCol: SortCol, sortDir: 'asc' | 'desc'): Auction[] {
   return [...data].sort((a, b) => {
+    if (sortCol === 'current_price') {
+      const va = a.current_price;
+      const vb = b.current_price;
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      const cmp = va - vb;
+      return sortDir === 'asc' ? cmp : -cmp;
+    }
     const va = a[sortCol] ?? '';
     const vb = b[sortCol] ?? '';
-    const cmp = (sortCol === 'starting_price' || sortCol === 'current_price' || sortCol === 'is_first_sale')
+    const cmp = (sortCol === 'starting_price' || sortCol === 'is_first_sale')
       ? Number(va) - Number(vb)
       : String(va).localeCompare(String(vb), 'sr');
     return sortDir === 'asc' ? cmp : -cmp;
