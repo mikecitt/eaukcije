@@ -114,6 +114,7 @@ All variables live in `.env` (copy from `.env.example`):
 | `DATABASE_URL` | Yes | PostgreSQL connection string, e.g. `postgres://user:pass@host:5432/db` |
 | `POSTGRES_PASSWORD` | Docker only | Password injected into the `postgres` service in Docker Compose |
 | `JWT_SECRET` | Yes | Secret used to sign/verify login session JWTs. App refuses to start without it. |
+| `ADMIN_DEFAULT_PASSWORD` | No | Password used for the seeded default `admin` account on first boot (only takes effect if no `admin` user exists yet). Falls back to `changeme` if unset — always set this in any non-throwaway deployment and change it via `POST /api/auth/change-password` after first login regardless. |
 
 ---
 
@@ -123,7 +124,7 @@ All variables live in `.env` (copy from `.env.example`):
 - Sessions are a JWT (7-day expiry) stored in an **httpOnly** cookie named `token`, set on login. `JwtAuthGuard` (global, via `APP_GUARD`) verifies it on every request and attaches `req.user = { sub, username, role }`.
 - Two roles: `admin` and `user`. `AdminGuard` is applied per-controller/route to restrict admin-only actions.
 - **Regular users** can only view auction data (`GET /api/auctions`) and change their own password. They cannot trigger a refresh, delete the database, use the AI filter, or manage users — those routes reject them with `403`.
-- A default admin account (`admin` / `ProxmoxGuru123`) is seeded automatically on first boot (`AuthService.onModuleInit`) if no `admin` user exists yet. Change the password after first login via `POST /api/auth/change-password`.
+- A default admin account (username `admin`, password from `ADMIN_DEFAULT_PASSWORD`, falling back to `changeme` if unset) is seeded automatically on first boot (`AuthService.onModuleInit`) if no `admin` user exists yet. Change the password after first login via `POST /api/auth/change-password`.
 - Admins manage regular user accounts (create/list/delete) via `/api/users`. Users cannot delete their own account, and the seeded `admin` account cannot be deleted via the UI (no delete button rendered for `role: admin`).
 - **Favorites** are personal, not admin-gated: any logged-in user (admin or regular) can star/unstar auctions via `/api/favorites`. Each user only ever sees and mutates their own favorites (scoped by `req.user.sub`).
 
@@ -284,13 +285,13 @@ Per-view UI state (search text, sort column/direction, pagination, AI filter que
 
 ```bash
 cp .env.example .env
-# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, DATABASE_URL, JWT_SECRET
+# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, DATABASE_URL, JWT_SECRET, ADMIN_DEFAULT_PASSWORD
 
 npm install
 npm run dev             # backend: ts-node backend/src/main.ts (port 3000)
 npm run dev:frontend    # in a second terminal: Vite dev server (proxies /api to :3000)
 # open the Vite dev server URL it prints (default http://localhost:5173)
-# log in as admin / ProxmoxGuru123, then change the password
+# log in as admin / <your ADMIN_DEFAULT_PASSWORD>, then change the password
 ```
 
 A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configure. To exercise the production setup (single origin, no Vite dev server), run `npm run build` then `npm start` and open `http://localhost:3000` directly.
@@ -299,7 +300,7 @@ A local PostgreSQL instance must be reachable at the `DATABASE_URL` you configur
 
 ```bash
 cp .env.example .env
-# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, POSTGRES_PASSWORD, JWT_SECRET
+# Edit .env — set DB_REMOVE_PASSWORD, GEMINI_API_KEY, POSTGRES_PASSWORD, JWT_SECRET, ADMIN_DEFAULT_PASSWORD
 
 docker compose up --build
 # open http://localhost:3000

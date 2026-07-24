@@ -6,7 +6,7 @@ import { DatabaseService } from '../database/database.service';
 const TOKEN_TTL = '7d';
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_ADMIN_USERNAME = 'admin';
-const DEFAULT_ADMIN_PASSWORD = 'ProxmoxGuru123';
+const FALLBACK_ADMIN_PASSWORD = 'changeme';
 
 export interface AuthTokenPayload {
   sub: number;
@@ -21,7 +21,8 @@ export class AuthService implements OnModuleInit {
   async onModuleInit() {
     const { rows } = await this.db.query('SELECT id FROM users WHERE username = $1', [DEFAULT_ADMIN_USERNAME]);
     if (rows.length === 0) {
-      const hash = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
+      const password = process.env.ADMIN_DEFAULT_PASSWORD || FALLBACK_ADMIN_PASSWORD;
+      const hash = await bcrypt.hash(password, 10);
       await this.db.query(
         'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)',
         [DEFAULT_ADMIN_USERNAME, hash, 'admin'],

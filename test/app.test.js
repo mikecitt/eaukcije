@@ -5,6 +5,7 @@ const request = require('supertest');
 require('reflect-metadata');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-app-tests';
 process.env.DB_REMOVE_PASSWORD = process.env.DB_REMOVE_PASSWORD || 'test-remove-password';
+process.env.ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || 'test-admin-password';
 
 const { Test } = require('@nestjs/testing');
 const cookieParser = require('cookie-parser');
@@ -34,7 +35,7 @@ before(async () => {
     adminAgent = request.agent(server);
     const res = await adminAgent
       .post('/api/auth/login')
-      .send({ username: 'admin', password: 'ProxmoxGuru123' });
+      .send({ username: 'admin', password: process.env.ADMIN_DEFAULT_PASSWORD });
     if (res.status !== 200) {
       throw new Error(`seeded admin login failed with status ${res.status}`);
     }
