@@ -29,9 +29,9 @@ export class RefreshService {
       for (const a of existingAuctions) {
         await client.query(
           `UPDATE auctions
-           SET status = $1, status_translation = $2, starting_price = $3, start_date = $4, end_date = $5
-           WHERE id = $6`,
-          [a.Status || '', a.StatusTranslation || '', a.StartingPrice, a.StartDate, a.EndDate, String(a.Id)],
+           SET status = $1, status_translation = $2, starting_price = $3, current_price = $4, start_date = $5, end_date = $6
+           WHERE id = $7`,
+          [a.Status || '', a.StatusTranslation || '', a.StartingPrice, a.CurrentPrice, a.StartDate, a.EndDate, String(a.Id)],
         );
       }
       await client.query('COMMIT');
@@ -60,9 +60,9 @@ export class RefreshService {
       await this.db.query(
         `INSERT INTO auctions
            (id, auction_number, short_description, place_name, place_municipality,
-            status, status_translation, starting_price, start_date, end_date,
+            status, status_translation, starting_price, current_price, start_date, end_date,
             property_type, is_first_sale, details_fetched, raw_data)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          ON CONFLICT (id) DO NOTHING`,
         [
           id,
@@ -73,6 +73,7 @@ export class RefreshService {
           a.Status               || '',
           a.StatusTranslation    || '',
           a.StartingPrice        || 0,
+          a.CurrentPrice,
           a.StartDate            || '',
           a.EndDate              || '',
           a.PropertyType         || '',

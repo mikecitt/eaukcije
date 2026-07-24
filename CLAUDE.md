@@ -202,6 +202,7 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 | `status` | TEXT | Cyrillic status from API |
 | `status_translation` | TEXT | English translation |
 | `starting_price` | REAL | |
+| `current_price` | REAL | Nullable; from API's `CurrentPrice`. Table shows it only when it differs from `starting_price`, otherwise "—" |
 | `start_date` | TEXT | ISO 8601 |
 | `end_date` | TEXT | ISO 8601 |
 | `property_type` | TEXT | |

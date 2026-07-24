@@ -8,7 +8,7 @@ export class AuctionsService {
   async findAll() {
     const { rows: auctions } = await this.db.query(`
       SELECT id, auction_number, short_description, place_name, place_municipality,
-             status, status_translation, starting_price, start_date, end_date,
+             status, status_translation, starting_price, current_price, start_date, end_date,
              property_type, is_first_sale, details_fetched, added_at
       FROM auctions ORDER BY added_at DESC
     `);

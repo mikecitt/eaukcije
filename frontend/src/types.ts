@@ -7,6 +7,7 @@ export interface Auction {
   status: string;
   status_translation: string;
   starting_price: number;
+  current_price: number | null;
   start_date: string;
   end_date: string;
   property_type: string;
