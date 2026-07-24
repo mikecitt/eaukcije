@@ -1,4 +1,4 @@
-import { Controller, Post, Res, UseGuards } from '@nestjs/common';
+import { Controller, Post, Param, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { RefreshService } from './refresh.service';
 import { AdminGuard } from '../auth/admin.guard';
@@ -7,6 +7,11 @@ import { AdminGuard } from '../auth/admin.guard';
 @UseGuards(AdminGuard)
 export class RefreshController {
   constructor(private readonly refreshService: RefreshService) {}
+
+  @Post(':id')
+  refreshOne(@Param('id') id: string) {
+    return this.refreshService.refreshOne(id);
+  }
 
   @Post()
   async refresh(@Res() res: Response) {

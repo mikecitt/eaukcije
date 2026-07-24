@@ -41,7 +41,7 @@ export const fmtPrice = (val?: number | null): string => {
 };
 
 export const statusBadgeClass = (status?: string, translation?: string): string => {
-  const t = stripDiacritics(cyrToLat(translation || status || '').toLowerCase());
+  const t = stripDiacritics(cyrToLat(status || translation || '').toLowerCase());
   if (t.includes('potvrđ') || t.includes('potvrd') || t.includes('aktiv')) return 'badge-verified';
   if (t.includes('otkaz') || t.includes('cancel')) return 'badge-cancelled';
   if (t.includes('zavrs') || t.includes('complet')) return 'badge-completed';

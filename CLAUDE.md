@@ -148,6 +148,7 @@ All variables live in `.env` (copy from `.env.example`):
 | `POST` | `/api/favorites/:auctionId` | Logged in | Add an auction to the current user's favorites |
 | `DELETE` | `/api/favorites/:auctionId` | Logged in | Remove an auction from the current user's favorites |
 | `POST` | `/api/refresh` | Admin | Fetch fresh data from eaukcija.sud.rs; streams SSE progress |
+| `POST` | `/api/refresh/:id` | Admin | Refresh a single auction from `GetImmovablePropertyDetails`; returns the updated row as JSON |
 | `GET` | `/api/scheduler/settings` | Admin | Current auto-refresh schedule, available presets, and next scheduled run |
 | `PUT` | `/api/scheduler/settings` | Admin | `{preset, cron?}` — update the auto-refresh schedule; applies live, no restart |
 | `POST` | `/api/ai-filter` | Admin | Natural language filter via Gemini 2.5 Flash |
@@ -256,7 +257,7 @@ Composite primary key `(user_id, auction_id)` — one row per user/auction favor
 |---|---|
 | `AuthContext` | `currentUser`, `loading`, `login()`, `logout()` — resolves `GET /api/auth/me` once on mount |
 | `MessageContext` | Top-of-page alert banner (`error`/`success`/`info`), auto-dismissed after 8s except errors |
-| `AuctionsDataContext` | `allAuctions`, `favoriteIds`, `lastRefresh`, `loaded`/`ensureLoaded()` (lazy first load, mirrors the old `auctionsLoaded` guard), `toggleFavorite()`, `clearDatabase()`, and the refresh SSE state/`doRefresh()` — mounted once per login session so `Header`'s refresh/clear-db actions and `AuctionsView`'s table share the same data regardless of which route is active |
+| `AuctionsDataContext` | `allAuctions`, `favoriteIds`, `lastRefresh`, `loaded`/`ensureLoaded()` (lazy first load, mirrors the old `auctionsLoaded` guard), `toggleFavorite()`, `clearDatabase()`, `refreshingIds`/`refreshAuction()` (per-row refresh), and the refresh SSE state/`doRefresh()` — mounted once per login session so `Header`'s refresh/clear-db actions and `AuctionsView`'s table share the same data regardless of which route is active |
 
 Per-view UI state (search text, sort column/direction, pagination, AI filter query) lives as local `useState` inside `AuctionsView`/`AdminView`, not in a context — it doesn't need to survive a route change since it's re-derived on mount.
 
@@ -278,6 +279,8 @@ Per-view UI state (search text, sort column/direction, pagination, AI filter que
 **Cyrillic handling:** All text is stored as Cyrillic in the DB. `transformAuction()` (`utils.ts`) converts every text field to Serbian Latin at load time using `cyrToLat()`. Search also strips diacritics via `stripDiacritics()` so e.g. `"kuca"` matches `"kuća"`.
 
 **Refresh via SSE:** `AuctionsDataContext.doRefresh()` calls `POST /api/refresh` and reads the response body as a stream of `data: {...}\n\n` events with types `status`, `progress`, `done`, `error`, updating progress-bar state as they arrive.
+
+**Per-row refresh (concluded auctions):** The bulk refresh only sees auctions still returned by `GetAuctionsByCategoryId` — once an auction concludes on eaukcija.sud.rs it drops out of that listing entirely, so its final status/price stop being picked up by `runRefresh()`. Each row's `col-fav` cell has a small ⟳ button (`AuctionsTable`, admin only, next to the favorite star) that calls `AuctionsDataContext.refreshAuction(id)` → `POST /api/refresh/:id` → `RefreshService.refreshOne()`, which calls `GetImmovablePropertyDetails` directly (keyed by ID, works regardless of category-listing state) and updates whichever columns the response actually contains — it doesn't overwrite a column with a blank/undefined value, since the exact field shape for concluded auctions isn't confirmed yet. `refreshingIds` (a `Set<string>`) tracks in-flight per-row requests so the button disables/spins only for the row being refreshed. On success the returned row is merged into `allAuctions` in place — no full `/api/auctions` reload and no pagination reset, since `AuctionsView`'s `page` state only resets on filter/sort changes, not on `allAuctions` updates.
 
 ---
 

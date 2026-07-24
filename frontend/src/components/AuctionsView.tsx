@@ -14,6 +14,7 @@ export default function AuctionsView() {
   const isAdmin = currentUser?.role === 'admin';
   const {
     allAuctions, favoriteIds, ensureLoaded, toggleFavorite,
+    refreshingIds, refreshAuction,
     showProgress, progressText, progressPercent,
   } = useAuctionsData();
 
@@ -109,6 +110,9 @@ export default function AuctionsView() {
           sortCol={sortCol}
           sortDir={sortDir}
           onSort={handleSort}
+          isAdmin={isAdmin}
+          refreshingIds={refreshingIds}
+          onRefreshAuction={refreshAuction}
         />
 
         <Pagination page={clampedPage} perPage={pp} total={filteredAuctions.length} onPage={setPage} />

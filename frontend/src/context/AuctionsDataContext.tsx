@@ -14,6 +14,9 @@ interface AuctionsDataContextValue {
   toggleFavorite: (id: string) => Promise<void>;
   clearDatabase: (password: string) => Promise<void>;
 
+  refreshingIds: Set<string>;
+  refreshAuction: (id: string) => Promise<void>;
+
   refreshBusy: boolean;
   showProgress: boolean;
   progressText: string;
@@ -30,6 +33,7 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [progressText, setProgressText] = useState('');
@@ -79,6 +83,24 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
       showMsg('error', `Greška pri čuvanju favorita: ${err.message}`);
     }
   }, [favoriteIds, showMsg]);
+
+  const refreshAuction = useCallback(async (id: string) => {
+    if (refreshingIds.has(id)) return;
+    setRefreshingIds(prev => new Set(prev).add(id));
+    try {
+      const updated = await api.refreshAuction(id);
+      setAllAuctions(prev => prev.map(a => a.id === id ? transformAuction({ ...a, ...updated }) : a));
+      showMsg('success', 'Aukcija osvežena.');
+    } catch (err: any) {
+      showMsg('error', `Greška pri osvežavanju aukcije: ${err.message}`);
+    } finally {
+      setRefreshingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, [refreshingIds, showMsg]);
 
   const clearDatabase = useCallback(async (password: string) => {
     await api.clearAuctions(password);
@@ -166,6 +188,7 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
     <AuctionsDataContext.Provider value={{
       allAuctions, favoriteIds, lastRefresh, loaded, ensureLoaded, reload,
       toggleFavorite, clearDatabase,
+      refreshingIds, refreshAuction,
       refreshBusy, showProgress, progressText, progressPercent, doRefresh,
     }}>
       {children}

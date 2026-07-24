@@ -48,6 +48,9 @@ export const api = {
   addFavorite: (id: string) => request(`/api/favorites/${encodeURIComponent(id)}`, { method: 'POST' }),
   removeFavorite: (id: string) => request(`/api/favorites/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+  refreshAuction: (id: string) =>
+    request<import('./types').Auction>(`/api/refresh/${encodeURIComponent(id)}`, { method: 'POST' }),
+
   aiFilter: (description: string, ids: string[]) =>
     request<{ matchingIds: string[] }>('/api/ai-filter', {
       method: 'POST',
