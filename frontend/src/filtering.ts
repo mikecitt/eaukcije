@@ -51,7 +51,7 @@ export function sortData(data: Auction[], sortCol: SortCol, sortDir: 'asc' | 'de
   return [...data].sort((a, b) => {
     const va = a[sortCol] ?? '';
     const vb = b[sortCol] ?? '';
-    const cmp = (sortCol === 'starting_price' || sortCol === 'is_first_sale')
+    const cmp = (sortCol === 'starting_price' || sortCol === 'current_price' || sortCol === 'is_first_sale')
       ? Number(va) - Number(vb)
       : String(va).localeCompare(String(vb), 'sr');
     return sortDir === 'asc' ? cmp : -cmp;
