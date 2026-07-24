@@ -169,7 +169,10 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
           break;
         case 'progress':
           setProgressText(ev.message);
-          setProgressPercent(8 + Math.round((ev.current / ev.total) * 87));
+          // ev.current is already the final 0-100 display percentage computed
+          // by RefreshService (ev.total is always 100) — remapping it again
+          // here would double-compress it and desync the bar from ev.message.
+          setProgressPercent(ev.current);
           break;
         case 'done':
           setProgressText('Osvežavanje završeno!');
@@ -183,6 +186,7 @@ export function AuctionsDataProvider({ children }: { children: ReactNode }) {
           reload();
           break;
         case 'error':
+          setProgressText(`Greška: ${ev.message}`);
           showMsg('error', `Greška: ${ev.message}`);
           break;
       }
