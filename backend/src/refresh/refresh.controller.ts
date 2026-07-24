@@ -18,6 +18,11 @@ export class RefreshController {
     res.setHeader('Content-Type',  'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection',    'keep-alive');
+    // Tells nginx-class reverse proxies not to buffer this response — without
+    // it a proxy in front of the app can hold the whole SSE stream until the
+    // connection closes, so the browser gets every event in one burst at the
+    // end instead of as they're produced.
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
