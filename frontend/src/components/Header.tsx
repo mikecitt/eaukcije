@@ -5,6 +5,7 @@ import { useAuctionsData } from '../context/AuctionsDataContext';
 import DeleteDbModal from './DeleteDbModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import ScheduleModal from './ScheduleModal';
+import RefreshConfirmModal from './RefreshConfirmModal';
 
 function fmtLastRefresh(ts: string | null): string {
   if (!ts) return 'Nije osveženo';
@@ -14,7 +15,7 @@ function fmtLastRefresh(ts: string | null): string {
 
 export default function Header() {
   const { currentUser, logout } = useAuth();
-  const { lastRefresh, refreshBusy, doRefresh } = useAuctionsData();
+  const { lastRefresh, refreshBusy } = useAuctionsData();
   const navigate = useNavigate();
   const location = useLocation();
   const isAdmin = currentUser?.role === 'admin';
@@ -24,6 +25,7 @@ export default function Header() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [changePwOpen, setChangePwOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function Header() {
                 {isAdmin ? 'Administrator' : 'Korisnik'}
               </div>
               {isAdmin && (
-                <button className="dropdown-item" disabled={refreshBusy} onClick={doRefresh}>
+                <button className="dropdown-item" disabled={refreshBusy} onClick={() => setRefreshConfirmOpen(true)}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
                        strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="23 4 23 10 17 10" />
@@ -117,6 +119,7 @@ export default function Header() {
       {deleteOpen && <DeleteDbModal onClose={() => setDeleteOpen(false)} />}
       {changePwOpen && <ChangePasswordModal onClose={() => setChangePwOpen(false)} />}
       {scheduleOpen && <ScheduleModal onClose={() => setScheduleOpen(false)} />}
+      {refreshConfirmOpen && <RefreshConfirmModal onClose={() => setRefreshConfirmOpen(false)} />}
     </>
   );
 }

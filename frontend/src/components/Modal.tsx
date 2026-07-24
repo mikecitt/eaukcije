@@ -1,9 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
-export default function Modal({ children, onClose, initialFocusRef }: {
+export default function Modal({ children, onClose, initialFocusRef, className }: {
   children: ReactNode;
   onClose: () => void;
   initialFocusRef?: React.RefObject<HTMLElement>;
+  className?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -22,5 +23,5 @@ export default function Modal({ children, onClose, initialFocusRef }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <dialog ref={dialogRef}>{children}</dialog>;
+  return <dialog ref={dialogRef} className={className}>{children}</dialog>;
 }

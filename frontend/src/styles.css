@@ -452,6 +452,13 @@ dialog {
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
 dialog::backdrop { background: rgba(0,0,0,0.45); }
+dialog.modal-wide { max-width: 480px; }
+.status-exclude-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-bottom: 18px;
+}
 .modal-title { font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: var(--text); }
 .modal-desc  { font-size: 0.85rem; color: var(--muted); margin-bottom: 16px; }
 .modal-input {
