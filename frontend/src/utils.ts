@@ -40,6 +40,11 @@ export const fmtPrice = (val?: number | null): string => {
   return new Intl.NumberFormat('sr-RS', { style: 'currency', currency: 'RSD', maximumFractionDigits: 0 }).format(val);
 };
 
+export const fmtCurrentPrice = (currentPrice?: number | null, startingPrice?: number | null): string => {
+  if (currentPrice == null || currentPrice === startingPrice) return '-';
+  return fmtPrice(currentPrice);
+};
+
 // Exact status codes as returned by GetAuctionsByCategoryId's `Status` field
 // (confirmed from the live status filter dropdown, not translated text).
 const STATUS_BADGE_MAP: Record<string, string> = {

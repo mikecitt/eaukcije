@@ -203,6 +203,7 @@ Uses `gemini-2.5-flash`. Frontend sends only auction IDs; backend fetches key fi
 | `status` | TEXT | Cyrillic status from API |
 | `status_translation` | TEXT | English translation |
 | `starting_price` | REAL | |
+| `current_price` | REAL | Extracted from the API's `CurrentPrice` field (bulk refresh, per-row refresh, and new-auction inserts). Nullable — some auctions have no current price yet. |
 | `start_date` | TEXT | ISO 8601 |
 | `end_date` | TEXT | ISO 8601 |
 | `property_type` | TEXT | |

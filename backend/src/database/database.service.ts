@@ -22,6 +22,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         status              TEXT,
         status_translation  TEXT,
         starting_price      REAL,
+        current_price       REAL,
         start_date          TEXT,
         end_date            TEXT,
         property_type       TEXT,
@@ -30,6 +31,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         raw_data            TEXT,
         added_at            TIMESTAMPTZ DEFAULT NOW()
       );
+
+      ALTER TABLE auctions ADD COLUMN IF NOT EXISTS current_price REAL;
 
       CREATE TABLE IF NOT EXISTS meta (
         key   TEXT PRIMARY KEY,

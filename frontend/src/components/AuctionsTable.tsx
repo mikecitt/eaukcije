@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import type { Auction } from '../types';
-import { fmtDate, fmtDateTime, fmtPrice, statusBadgeClass, cyrToLat } from '../utils';
+import { fmtDate, fmtDateTime, fmtPrice, fmtCurrentPrice, statusBadgeClass, cyrToLat } from '../utils';
 import type { SortCol } from '../filtering';
 import { StarIcon, RefreshIcon } from './icons';
 
@@ -9,6 +9,7 @@ const COLUMNS: { col: SortCol; label: string }[] = [
   { col: 'place_name', label: 'Mesto' },
   { col: 'status', label: 'Status' },
   { col: 'starting_price', label: 'Poc. cena' },
+  { col: 'current_price', label: 'Cena' },
   { col: 'start_date', label: 'Pocetak' },
   { col: 'end_date', label: 'Kraj' },
   { col: 'is_first_sale', label: '1. Prod.' },
@@ -61,7 +62,7 @@ export default function AuctionsTable({
         </thead>
         <tbody>
           {!hasAny ? (
-            <tr><td colSpan={11}>
+            <tr><td colSpan={12}>
               <div className="empty">
                 <h3>Nema rezultata</h3>
                 <p>{hasAnyTotal ? 'Nema aukcija koje odgovaraju filterima' : 'Kliknite "Osveži" da preuzmete aukcije'}</p>
@@ -79,7 +80,7 @@ export default function AuctionsTable({
             return (
               <Fragment key={a.id}>
                 {groupHeader && (
-                  <tr className="group-header"><td colSpan={11}>{groupHeader}</td></tr>
+                  <tr className="group-header"><td colSpan={12}>{groupHeader}</td></tr>
                 )}
                 <tr className={isFav ? 'fav-row' : ''}>
                   <td className="col-fav">
@@ -114,6 +115,7 @@ export default function AuctionsTable({
                   </td>
                   <td><span className={`badge ${statusBadgeClass(a.status, a.status_translation)}`}>{cyrToLat(a.status || a.status_translation || '—')}</span></td>
                   <td className="col-price">{fmtPrice(a.starting_price)}</td>
+                  <td className="col-price">{fmtCurrentPrice(a.current_price, a.starting_price)}</td>
                   <td className="col-date">{fmtDate(a.start_date)}</td>
                   <td className="col-date">{fmtDate(a.end_date)}</td>
                   <td className={a.is_first_sale ? 'first-yes' : 'first-no'}>{a.is_first_sale ? 'Da' : 'Ne'}</td>
