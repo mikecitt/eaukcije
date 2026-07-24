@@ -83,46 +83,51 @@ export class RefreshService {
     return updated[0];
   }
 
-  async runRefresh(onProgress: (msg: string, pct: number) => void = () => {}) {
+  // excludedStatuses: auctions already sitting in one of these statuses (per
+  // the DB's *current* value, before this run) are skipped entirely — their
+  // outcome is final and won't change, so there's no point spending a
+  // GetImmovablePropertyDetails call on them every single refresh.
+  async runRefresh(
+    onProgress: (msg: string, pct: number) => void = () => {},
+    excludedStatuses: string[] = [],
+  ) {
     onProgress('Preuzimanje liste aukcija...', 0);
 
     const apiAuctions = await this.eaukcija.fetchAllAuctions();
-    onProgress(`Pronađeno ${apiAuctions.length} aukcija. Provjera novih...`, 5);
+    onProgress(`Pronađeno ${apiAuctions.length} aukcija. Provera novih...`, 5);
 
-    const { rows: existingRows } = await this.db.query('SELECT id FROM auctions');
-    const existingIds = new Set(existingRows.map(r => r.id));
+    const excluded = new Set(excludedStatuses.map(s => s.trim().toLowerCase()));
 
-    const newAuctions      = apiAuctions.filter(a => !existingIds.has(String(a.Id)));
-    const existingAuctions = apiAuctions.filter(a =>  existingIds.has(String(a.Id)));
+    const { rows: existingRows } = await this.db.query('SELECT id, status, raw_data FROM auctions');
+    const existingRowById = new Map(existingRows.map(r => [r.id, r]));
 
-    onProgress(`${newAuctions.length} novih, ${existingAuctions.length} postojećih. Ažuriranje...`, 8);
+    const newAuctions      = apiAuctions.filter(a => !existingRowById.has(String(a.Id)));
+    const existingAuctions = apiAuctions.filter(a =>  existingRowById.has(String(a.Id)));
 
-    const client = await this.db.connect();
-    try {
-      await client.query('BEGIN');
-      for (const a of existingAuctions) {
-        await client.query(
-          `UPDATE auctions
-           SET status = $1, status_translation = $2, starting_price = $3, start_date = $4, end_date = $5
-           WHERE id = $6`,
-          [a.Status || '', a.StatusTranslation || '', a.StartingPrice, a.StartDate, a.EndDate, String(a.Id)],
-        );
-      }
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
+    const skipped = existingAuctions.filter(a =>
+      excluded.has(String(existingRowById.get(String(a.Id))?.status || '').trim().toLowerCase()));
+    const toRefresh = existingAuctions.filter(a =>
+      !excluded.has(String(existingRowById.get(String(a.Id))?.status || '').trim().toLowerCase()));
+
+    onProgress(
+      `${newAuctions.length} novih, ${toRefresh.length} za osvežavanje, ${skipped.length} preskočeno (isključeni statusi). Obogaćivanje...`,
+      8,
+    );
+
+    const toProcess = [
+      ...newAuctions.map(a => ({ a, isNew: true })),
+      ...toRefresh.map(a => ({ a, isNew: false })),
+    ];
 
     let processed = 0;
     let failed    = 0;
 
-    for (let i = 0; i < newAuctions.length; i++) {
-      const a  = newAuctions[i];
+    for (const { a, isNew } of toProcess) {
       const id = String(a.Id);
 
+      // Full refresh, not just the summary fields from the category
+      // listing: fetch GetImmovablePropertyDetails for every auction we
+      // actually process (new or existing), same as a single-row refresh.
       let details = null;
       try {
         details = await this.eaukcija.fetchAuctionDetails(id);
@@ -131,36 +136,79 @@ export class RefreshService {
         failed++;
       }
 
-      await this.db.query(
-        `INSERT INTO auctions
-           (id, auction_number, short_description, place_name, place_municipality,
-            status, status_translation, starting_price, start_date, end_date,
-            property_type, is_first_sale, details_fetched, raw_data)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-         ON CONFLICT (id) DO NOTHING`,
-        [
-          id,
-          a.AuctionNumber        || '',
-          a.ShortDescription     || '',
-          details?.Place?.Name         || '',
-          details?.Place?.Municipality || '',
-          a.Status               || '',
-          a.StatusTranslation    || '',
-          a.StartingPrice        || 0,
-          a.StartDate            || '',
-          a.EndDate              || '',
-          a.PropertyType         || '',
-          a.IsFirstSale ? 1 : 0,
-          details ? 1 : 0,
-          JSON.stringify({ auction: a, details }),
-        ],
-      );
+      if (isNew) {
+        await this.db.query(
+          `INSERT INTO auctions
+             (id, auction_number, short_description, place_name, place_municipality,
+              status, status_translation, starting_price, start_date, end_date,
+              property_type, is_first_sale, details_fetched, raw_data)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            id,
+            a.AuctionNumber        || '',
+            a.ShortDescription     || '',
+            details?.Place?.Name         || '',
+            details?.Place?.Municipality || '',
+            a.Status               || '',
+            a.StatusTranslation    || '',
+            a.StartingPrice        || 0,
+            a.StartDate            || '',
+            a.EndDate              || '',
+            a.PropertyType         || '',
+            a.IsFirstSale ? 1 : 0,
+            details ? 1 : 0,
+            JSON.stringify({ auction: a, details }),
+          ],
+        );
+      } else {
+        let raw;
+        try {
+          raw = JSON.parse(existingRowById.get(id)?.raw_data || '{}');
+        } catch {
+          raw = {};
+        }
+        raw.auction = a;
+
+        // Only touch place/raw-details/details_fetched when this round's
+        // detail fetch actually succeeded — a transient failure shouldn't
+        // blank out place info a previous successful refresh already found.
+        const entries: [string, any][] = [
+          ['auction_number',     a.AuctionNumber        || ''],
+          ['short_description',  a.ShortDescription     || ''],
+          ['status',             a.Status               || ''],
+          ['status_translation', a.StatusTranslation    || ''],
+          ['starting_price',     a.StartingPrice        || 0],
+          ['start_date',         a.StartDate            || ''],
+          ['end_date',           a.EndDate              || ''],
+          ['property_type',      a.PropertyType         || ''],
+          ['is_first_sale',      a.IsFirstSale ? 1 : 0],
+        ];
+        if (details) {
+          raw.details = details;
+          entries.push(
+            ['place_name',         details?.Place?.Name         || ''],
+            ['place_municipality', details?.Place?.Municipality || ''],
+            ['details_fetched',    1],
+          );
+        }
+        entries.push(['raw_data', JSON.stringify(raw)]);
+
+        const setClauses = entries.map(([col], i) => `${col} = $${i + 1}`);
+        const values: any[] = entries.map(([, val]) => val);
+        values.push(id);
+
+        await this.db.query(
+          `UPDATE auctions SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
+          values,
+        );
+      }
 
       processed++;
-      if (processed % 5 === 0 || processed === newAuctions.length) {
-        const pct = 8 + Math.round((processed / newAuctions.length) * 87);
+      if (processed % 5 === 0 || processed === toProcess.length) {
+        const pct = 8 + Math.round((processed / Math.max(toProcess.length, 1)) * 87);
         onProgress(
-          `Obogaćeno ${processed}/${newAuctions.length} novih aukcija${failed ? ` (${failed} neuspelih)` : ''}`,
+          `Obogaćeno ${processed}/${toProcess.length} aukcija${failed ? ` (${failed} neuspelih)` : ''}`,
           pct,
         );
       }
@@ -173,6 +221,12 @@ export class RefreshService {
       ['last_refresh', now],
     );
 
-    return { newCount: newAuctions.length, updatedCount: existingAuctions.length, failedCount: failed, lastRefresh: now };
+    return {
+      newCount:     newAuctions.length,
+      updatedCount: toRefresh.length,
+      skippedCount: skipped.length,
+      failedCount:  failed,
+      lastRefresh:  now,
+    };
   }
 }

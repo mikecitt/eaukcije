@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Res, UseGuards } from '@nestjs/common';
+import { Controller, Post, Param, Body, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { RefreshService } from './refresh.service';
 import { AdminGuard } from '../auth/admin.guard';
@@ -14,7 +14,7 @@ export class RefreshController {
   }
 
   @Post()
-  async refresh(@Res() res: Response) {
+  async refresh(@Body() body: { excludedStatuses?: string[] }, @Res() res: Response) {
     res.setHeader('Content-Type',  'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection',    'keep-alive');
@@ -29,7 +29,7 @@ export class RefreshController {
           ? { type, message }
           : { type, message, current: pct, total: 100 }
         );
-      });
+      }, body?.excludedStatuses || []);
       send({ type: 'done', ...result });
     } catch (err) {
       console.error('Refresh route error:', err);

@@ -42,17 +42,30 @@ export const fmtPrice = (val?: number | null): string => {
 
 // Exact status codes as returned by GetAuctionsByCategoryId's `Status` field
 // (confirmed from the live status filter dropdown, not translated text).
-const STATUS_BADGE_MAP: Record<string, string> = {
-  verified:              'badge-verified',
-  inprogress:            'badge-verified',
-  verification:          'badge-unverified',
-  inprediction:          'badge-unverified',
-  closed:                'badge-completed',
-  closedwithoutbids:     'badge-default',
-  canceled:              'badge-cancelled',
-  canceledbysystem:      'badge-cancelled',
-  unsuccessfullystarted: 'badge-cancelled',
-};
+const STATUS_BADGES: [string, string][] = [
+  ['Verified',              'badge-verified'],
+  ['InProgress',             'badge-verified'],
+  ['Verification',          'badge-unverified'],
+  ['InPrediction',          'badge-unverified'],
+  ['Closed',                'badge-completed'],
+  ['ClosedWithoutBids',     'badge-default'],
+  ['Canceled',              'badge-cancelled'],
+  ['CanceledBySystem',      'badge-cancelled'],
+  ['UnsuccessfullyStarted', 'badge-cancelled'],
+];
+
+export const KNOWN_STATUSES = STATUS_BADGES.map(([s]) => s);
+
+// Terminal statuses that don't change once reached — the default set of
+// statuses excluded from a bulk refresh so it doesn't re-fetch every
+// already-concluded auction's details on every run.
+export const DEFAULT_EXCLUDED_STATUSES = [
+  'Closed', 'ClosedWithoutBids', 'Canceled', 'CanceledBySystem', 'UnsuccessfullyStarted',
+];
+
+const STATUS_BADGE_MAP: Record<string, string> = Object.fromEntries(
+  STATUS_BADGES.map(([s, cls]) => [s.toLowerCase(), cls]),
+);
 
 export const statusBadgeClass = (status?: string, translation?: string): string => {
   const known = STATUS_BADGE_MAP[(status || '').trim().toLowerCase()];

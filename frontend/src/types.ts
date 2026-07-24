@@ -48,5 +48,5 @@ export interface ScheduleSettings {
 export type RefreshEvent =
   | { type: 'status'; message: string }
   | { type: 'progress'; message: string; current: number; total: number }
-  | { type: 'done'; newCount: number; updatedCount: number; failedCount?: number; lastRefresh: string }
+  | { type: 'done'; newCount: number; updatedCount: number; skippedCount?: number; failedCount?: number; lastRefresh: string }
   | { type: 'error'; message: string };
