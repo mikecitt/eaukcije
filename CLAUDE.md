@@ -328,6 +328,12 @@ npm test
 
 ---
 
+## Continuous integration
+
+`.circleci/config.yml` defines a single `build-and-test` job/workflow that runs on every push: a `cimg/node:lts` container plus a `cimg/postgres:16.11` service container (credentials `eaukcije`/`eaukcije`, db `eaukcije`), which installs backend and frontend dependencies (cached by lockfile checksum), builds both (`npm run build:backend`, `npm --prefix frontend run build`), waits for Postgres via the preinstalled `dockerize -wait tcp://localhost:5432`, then runs `npm test`. `DATABASE_URL`, `JWT_SECRET`, `DB_REMOVE_PASSWORD`, and `ADMIN_DEFAULT_PASSWORD` are set as throwaway values on the primary container — none of them need to match anything outside CI, since the test suite provisions its own dedicated test admin account regardless of what's seeded.
+
+---
+
 ## External API
 
 - **Host:** `eaukcija.sud.rs`

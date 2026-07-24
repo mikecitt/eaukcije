@@ -1,0 +1,61 @@
+version: 2.1
+
+jobs:
+  build-and-test:
+    docker:
+      - image: cimg/node:lts
+        environment:
+          DATABASE_URL: postgres://eaukcije:eaukcije@localhost:5432/eaukcije
+          JWT_SECRET: circleci_test_secret_do_not_use_in_prod
+          DB_REMOVE_PASSWORD: circleci_test_remove_password
+          ADMIN_DEFAULT_PASSWORD: circleci_test_admin_password
+      - image: cimg/postgres:16.11
+        environment:
+          POSTGRES_USER: eaukcije
+          POSTGRES_PASSWORD: eaukcije
+          POSTGRES_DB: eaukcije
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - backend-deps-v1-{{ checksum "package-lock.json" }}
+      - run:
+          name: Install backend dependencies
+          command: npm ci
+      - save_cache:
+          key: backend-deps-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - node_modules
+
+      - restore_cache:
+          keys:
+            - frontend-deps-v1-{{ checksum "frontend/package-lock.json" }}
+      - run:
+          name: Install frontend dependencies
+          command: npm ci --prefix frontend
+      - save_cache:
+          key: frontend-deps-v1-{{ checksum "frontend/package-lock.json" }}
+          paths:
+            - frontend/node_modules
+
+      - run:
+          name: Build backend (tsc)
+          command: npm run build:backend
+
+      - run:
+          name: Build frontend (vite)
+          command: npm --prefix frontend run build
+
+      - run:
+          name: Wait for Postgres
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+
+      - run:
+          name: Run tests
+          command: npm test
+
+workflows:
+  build-and-test:
+    jobs:
+      - build-and-test
