@@ -121,6 +121,27 @@ describe('GET /api/auctions', () => {
     assert.ok(Array.isArray(res.body.auctions), 'auctions should be an array');
     assert.ok('lastRefresh' in res.body, 'lastRefresh field should be present');
   });
+
+  test('includes current_price on each auction row', async t => {
+    if (!skipIfNoDb(t)) return;
+    const db = app.get(DatabaseService);
+    const testId = '__e2e_test_auction__';
+    await db.query(
+      `INSERT INTO auctions (id, starting_price, current_price)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET starting_price = EXCLUDED.starting_price, current_price = EXCLUDED.current_price`,
+      [testId, 1000, 1500],
+    );
+    try {
+      const res = await adminAgent.get('/api/auctions');
+      assert.equal(res.status, 200);
+      const row = res.body.auctions.find(a => a.id === testId);
+      assert.ok(row, 'test auction should be present in response');
+      assert.equal(row.current_price, 1500);
+    } finally {
+      await db.query('DELETE FROM auctions WHERE id = $1', [testId]);
+    }
+  });
 });
 
 describe('GET /api/favorites', () => {
