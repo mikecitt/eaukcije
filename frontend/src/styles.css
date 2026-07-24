@@ -317,11 +317,12 @@ td.col-num { color: var(--muted); font-size: 0.78rem; text-align: center; width:
 td.col-fav { text-align: center; width: 52px; white-space: nowrap; }
 
 .fav-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.05rem;
-  line-height: 1;
   padding: 2px;
   color: var(--border);
 }
@@ -329,11 +330,12 @@ td.col-fav { text-align: center; width: 52px; white-space: nowrap; }
 .fav-star.is-fav { color: #f59e0b; }
 
 .row-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 0.95rem;
-  line-height: 1;
   padding: 2px;
   margin-left: 2px;
   color: var(--border);

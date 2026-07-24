@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import type { Auction } from '../types';
 import { fmtDate, fmtDateTime, fmtPrice, statusBadgeClass, cyrToLat } from '../utils';
 import type { SortCol } from '../filtering';
+import { StarIcon, RefreshIcon } from './icons';
 
 const COLUMNS: { col: SortCol; label: string }[] = [
   { col: 'auction_number', label: 'Br. aukcije' },
@@ -87,7 +88,7 @@ export default function AuctionsTable({
                       title={isFav ? 'Ukloni iz favorita' : 'Dodaj u favorite'}
                       onClick={() => onToggleFavorite(a.id)}
                     >
-                      {isFav ? '★' : '☆'}
+                      <StarIcon filled={isFav} />
                     </button>
                     {isAdmin && (
                       <button
@@ -96,7 +97,7 @@ export default function AuctionsTable({
                         disabled={refreshingIds.has(a.id)}
                         onClick={() => onRefreshAuction(a.id)}
                       >
-                        ⟳
+                        <RefreshIcon />
                       </button>
                     )}
                   </td>
