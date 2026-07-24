@@ -9,6 +9,52 @@ export class RefreshService {
     private readonly eaukcija: EaukcijaService,
   ) {}
 
+  // Builds UPDATE entries for an auction we only have GetImmovablePropertyDetails
+  // for (no fresh category-listing data) — used both for a single-row refresh
+  // and for bulk-refreshing auctions that have fallen off the listing. The
+  // field shape for concluded auctions isn't confirmed, so this only
+  // overwrites columns the response actually set (checking both a nested
+  // `Auction` object and the response root).
+  private buildDetailsOnlyEntries(rawDataJson: string | null | undefined, details: any): [string, any][] {
+    const src = details?.Auction || details || {};
+
+    let raw: any;
+    try {
+      raw = JSON.parse(rawDataJson || '{}');
+    } catch {
+      raw = {};
+    }
+    raw.auction = { ...raw.auction, ...src };
+
+    const fields: Record<string, any> = {
+      auction_number:     src.AuctionNumber,
+      short_description:  src.ShortDescription,
+      status:             src.Status,
+      status_translation: src.StatusTranslation,
+      starting_price:     src.StartingPrice,
+      current_price:      src.CurrentPrice,
+      start_date:         src.StartDate,
+      end_date:           src.EndDate,
+      property_type:      src.PropertyType,
+      is_first_sale:      typeof src.IsFirstSale === 'boolean' ? (src.IsFirstSale ? 1 : 0) : undefined,
+    };
+
+    const entries: [string, any][] = Object.entries(fields)
+      .filter(([, val]) => val !== undefined && val !== null && val !== '');
+
+    if (details) {
+      raw.details = details;
+      entries.push(
+        ['place_name',         details?.Place?.Name         || ''],
+        ['place_municipality', details?.Place?.Municipality || ''],
+        ['details_fetched',    1],
+      );
+    }
+    entries.push(['raw_data', JSON.stringify(raw)]);
+
+    return entries;
+  }
+
   // Refreshes a single auction straight from GetImmovablePropertyDetails.
   // Needed for auctions that have concluded and dropped out of the
   // category listing that runRefresh() pages through, so their final
@@ -26,47 +72,9 @@ export class RefreshService {
       throw new InternalServerErrorException(`Preuzimanje podataka nije uspelo: ${e.message}`);
     }
 
-    // The details payload's shape for auction fields isn't confirmed for
-    // concluded auctions (they no longer show up in the category listing
-    // to compare against) — check both a nested `Auction` object and the
-    // response root, and only overwrite columns the response actually set.
-    const src = details?.Auction || details || {};
-
-    let raw;
-    try {
-      raw = JSON.parse(rows[0].raw_data || '{}');
-    } catch {
-      raw = {};
-    }
-    raw.details = details;
-    raw.auction = { ...raw.auction, ...src };
-
-    const fields: Record<string, any> = {
-      auction_number:     src.AuctionNumber,
-      short_description:  src.ShortDescription,
-      status:             src.Status,
-      status_translation: src.StatusTranslation,
-      starting_price:     src.StartingPrice,
-      current_price:      src.CurrentPrice,
-      start_date:         src.StartDate,
-      end_date:           src.EndDate,
-      property_type:      src.PropertyType,
-      is_first_sale:      typeof src.IsFirstSale === 'boolean' ? (src.IsFirstSale ? 1 : 0) : undefined,
-      place_name:         details?.Place?.Name,
-      place_municipality: details?.Place?.Municipality,
-    };
-
-    const setClauses: string[] = [];
-    const values: any[] = [];
-    for (const [col, val] of Object.entries(fields)) {
-      if (val !== undefined && val !== null && val !== '') {
-        values.push(val);
-        setClauses.push(`${col} = $${values.length}`);
-      }
-    }
-    values.push(JSON.stringify(raw));
-    setClauses.push(`raw_data = $${values.length}`);
-    setClauses.push('details_fetched = 1');
+    const entries = this.buildDetailsOnlyEntries(rows[0].raw_data, details);
+    const setClauses = entries.map(([col], i) => `${col} = $${i + 1}`);
+    const values: any[] = entries.map(([, val]) => val);
     values.push(id);
 
     await this.db.query(
@@ -98,37 +106,47 @@ export class RefreshService {
     onProgress(`Pronađeno ${apiAuctions.length} aukcija. Provera novih...`, 5);
 
     const excluded = new Set(excludedStatuses.map(s => s.trim().toLowerCase()));
+    const isExcluded = (status: any) => excluded.has(String(status || '').trim().toLowerCase());
 
     const { rows: existingRows } = await this.db.query('SELECT id, status, raw_data FROM auctions');
     const existingRowById = new Map(existingRows.map(r => [r.id, r]));
+    const apiIds = new Set(apiAuctions.map(a => String(a.Id)));
 
-    const newAuctions      = apiAuctions.filter(a => !existingRowById.has(String(a.Id)));
-    const existingAuctions = apiAuctions.filter(a =>  existingRowById.has(String(a.Id)));
+    const newAuctions    = apiAuctions.filter(a => !existingRowById.has(String(a.Id)));
+    const listedExisting = apiAuctions.filter(a =>  existingRowById.has(String(a.Id)));
+    // Auctions eaukcija.sud.rs no longer returns in the category listing at
+    // all — typically because they've concluded — used to never get
+    // touched again by the bulk refresh once they fell off. Still refresh
+    // them straight from GetImmovablePropertyDetails, just without fresh
+    // list-level fields to fall back on.
+    const missingIds = [...existingRowById.keys()].filter(id => !apiIds.has(id));
 
-    const skipped = existingAuctions.filter(a =>
-      excluded.has(String(existingRowById.get(String(a.Id))?.status || '').trim().toLowerCase()));
-    const toRefresh = existingAuctions.filter(a =>
-      !excluded.has(String(existingRowById.get(String(a.Id))?.status || '').trim().toLowerCase()));
+    const skippedListed    = listedExisting.filter(a => isExcluded(existingRowById.get(String(a.Id))?.status));
+    const toRefreshListed  = listedExisting.filter(a => !isExcluded(existingRowById.get(String(a.Id))?.status));
+    const skippedMissing   = missingIds.filter(id => isExcluded(existingRowById.get(id)?.status));
+    const toRefreshMissing = missingIds.filter(id => !isExcluded(existingRowById.get(id)?.status));
+
+    const skippedCount = skippedListed.length + skippedMissing.length;
+    const updatedCount = toRefreshListed.length + toRefreshMissing.length;
 
     onProgress(
-      `${newAuctions.length} novih, ${toRefresh.length} za osvežavanje, ${skipped.length} preskočeno (isključeni statusi). Obogaćivanje...`,
+      `${newAuctions.length} novih, ${updatedCount} za osvežavanje, ${skippedCount} preskočeno (isključeni statusi). Obogaćivanje...`,
       8,
     );
 
     const toProcess = [
-      ...newAuctions.map(a => ({ a, isNew: true })),
-      ...toRefresh.map(a => ({ a, isNew: false })),
+      ...newAuctions.map(a => ({ id: String(a.Id), a, isNew: true })),
+      ...toRefreshListed.map(a => ({ id: String(a.Id), a, isNew: false })),
+      ...toRefreshMissing.map(id => ({ id, a: null as any, isNew: false })),
     ];
 
     let processed = 0;
     let failed    = 0;
 
-    for (const { a, isNew } of toProcess) {
-      const id = String(a.Id);
-
+    for (const { id, a, isNew } of toProcess) {
       // Full refresh, not just the summary fields from the category
       // listing: fetch GetImmovablePropertyDetails for every auction we
-      // actually process (new or existing), same as a single-row refresh.
+      // actually process (new, listed-existing, or fallen off the listing).
       let details = null;
       try {
         details = await this.eaukcija.fetchAuctionDetails(id);
@@ -163,7 +181,7 @@ export class RefreshService {
             JSON.stringify({ auction: a, details }),
           ],
         );
-      } else {
+      } else if (a) {
         let raw;
         try {
           raw = JSON.parse(existingRowById.get(id)?.raw_data || '{}');
@@ -205,6 +223,19 @@ export class RefreshService {
           `UPDATE auctions SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
           values,
         );
+      } else {
+        // No list data at all — this auction has fallen off the category
+        // listing. Derive fields straight from GetImmovablePropertyDetails
+        // instead of the (nonexistent) listing snapshot.
+        const entries = this.buildDetailsOnlyEntries(existingRowById.get(id)?.raw_data, details);
+        const setClauses = entries.map(([col], i) => `${col} = $${i + 1}`);
+        const values: any[] = entries.map(([, val]) => val);
+        values.push(id);
+
+        await this.db.query(
+          `UPDATE auctions SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
+          values,
+        );
       }
 
       processed++;
@@ -225,11 +256,11 @@ export class RefreshService {
     );
 
     return {
-      newCount:     newAuctions.length,
-      updatedCount: toRefresh.length,
-      skippedCount: skipped.length,
-      failedCount:  failed,
-      lastRefresh:  now,
+      newCount: newAuctions.length,
+      updatedCount,
+      skippedCount,
+      failedCount: failed,
+      lastRefresh: now,
     };
   }
 }
