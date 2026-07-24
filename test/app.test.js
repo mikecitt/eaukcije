@@ -5,17 +5,26 @@ const request = require('supertest');
 require('reflect-metadata');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-app-tests';
 process.env.DB_REMOVE_PASSWORD = process.env.DB_REMOVE_PASSWORD || 'test-remove-password';
-process.env.ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || 'test-admin-password';
 
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 const { Test } = require('@nestjs/testing');
 const cookieParser = require('cookie-parser');
 const { AppModule } = require('../backend/src/app.module');
+const { DatabaseService } = require('../backend/src/database/database.service');
+
+// A dedicated test account, provisioned fresh on every run — independent of
+// whatever password the seeded default `admin` account currently has (it may
+// have been changed, or seeded with a different ADMIN_DEFAULT_PASSWORD, on a
+// pre-existing/dev database), so the suite doesn't fail setup against a
+// perfectly healthy app + database.
+const TEST_ADMIN_USERNAME = '__e2e_test_admin__';
+const TEST_ADMIN_PASSWORD = 'e2e-test-admin-password';
 
 let app;
 let server;
 let dbAvailable = false;
-let adminAgent; // supertest agent authenticated as the seeded admin
+let adminAgent; // supertest agent authenticated as the dedicated test admin
 
 // node:test evaluates a `skip` option at test-registration time, before this
 // before() hook has resolved — so tests must check dbAvailable themselves at
@@ -44,18 +53,29 @@ before(async () => {
   await app.init();
   server = app.getHttpServer();
 
+  const db = moduleRef.get(DatabaseService);
+  const hash = await bcrypt.hash(TEST_ADMIN_PASSWORD, 10);
+  await db.query(
+    `INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'admin')
+     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
+    [TEST_ADMIN_USERNAME, hash],
+  );
+
   adminAgent = request.agent(server);
   const res = await adminAgent
     .post('/api/auth/login')
-    .send({ username: 'admin', password: process.env.ADMIN_DEFAULT_PASSWORD });
+    .send({ username: TEST_ADMIN_USERNAME, password: TEST_ADMIN_PASSWORD });
   if (res.status !== 200) {
-    throw new Error(`seeded admin login failed with status ${res.status}`);
+    throw new Error(`test admin login failed with status ${res.status}`);
   }
   dbAvailable = true;
 });
 
 after(async () => {
-  if (app) await app.close();
+  if (!app) return;
+  const db = app.get(DatabaseService);
+  await db.query('DELETE FROM users WHERE username = $1', [TEST_ADMIN_USERNAME]);
+  await app.close();
 });
 
 describe('GET /health', () => {
@@ -88,7 +108,7 @@ describe('GET /api/auth/me', () => {
     if (!skipIfNoDb(t)) return;
     const res = await adminAgent.get('/api/auth/me');
     assert.equal(res.status, 200);
-    assert.equal(res.body.user.username, 'admin');
+    assert.equal(res.body.user.username, TEST_ADMIN_USERNAME);
     assert.equal(res.body.user.role, 'admin');
   });
 });

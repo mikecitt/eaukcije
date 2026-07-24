@@ -324,7 +324,7 @@ node backend/dist/main.js
 npm test
 ```
 
-`test/app.test.js` boots the real `AppModule` via `@nestjs/testing`, logs in as the seeded default admin, and exercises the actual guarded routes (`GET /health`, auth guard 401s, `/api/auctions`, `/api/favorites`, `/api/ai-filter` validation, `DELETE /api/auctions` password checks) with `supertest`. It requires the `DATABASE_URL` in `.env`/the environment to be reachable; if it isn't, every test calls `t.skip()` at run time (checked dynamically, not via node:test's static `skip` option, since that's evaluated before the async DB-connectivity check in `before()` can resolve) and the run reports skipped rather than failed.
+`test/app.test.js` boots the real `AppModule` via `@nestjs/testing` and exercises the actual guarded routes (`GET /health`, auth guard 401s, `/api/auctions`, `/api/favorites`, `/api/ai-filter` validation, `DELETE /api/auctions` password checks) with `supertest`. It probes `DATABASE_URL` reachability with a plain `pg` query before touching the app; if that fails, every test calls `t.skip()` at run time (checked dynamically, not via node:test's static `skip` option, since that's evaluated before the async check in `before()` can resolve) and the run reports skipped rather than failed. If the DB *is* reachable, any further setup failure (bad bootstrap, broken login) throws and fails the suite for real, instead of being folded into the same "DB unavailable" skip. Tests authenticate as a dedicated `__e2e_test_admin__` account provisioned (upserted with a known password, then deleted in `after()`) directly via `DatabaseService` — not the seeded default `admin` account, whose password may have been changed or seeded differently on a pre-existing database.
 
 ---
 
