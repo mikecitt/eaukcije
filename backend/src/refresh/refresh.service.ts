@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { EaukcijaService } from '../eaukcija/eaukcija.service';
 
@@ -8,6 +8,80 @@ export class RefreshService {
     private readonly db: DatabaseService,
     private readonly eaukcija: EaukcijaService,
   ) {}
+
+  // Refreshes a single auction straight from GetImmovablePropertyDetails.
+  // Needed for auctions that have concluded and dropped out of the
+  // category listing that runRefresh() pages through, so their final
+  // status/price never gets picked up by the bulk refresh anymore.
+  async refreshOne(id: string) {
+    const { rows } = await this.db.query('SELECT raw_data FROM auctions WHERE id = $1', [id]);
+    if (!rows.length) {
+      throw new NotFoundException('Aukcija nije pronađena u bazi');
+    }
+
+    let details;
+    try {
+      details = await this.eaukcija.fetchAuctionDetails(id);
+    } catch (e) {
+      throw new InternalServerErrorException(`Preuzimanje podataka nije uspelo: ${e.message}`);
+    }
+
+    // The details payload's shape for auction fields isn't confirmed for
+    // concluded auctions (they no longer show up in the category listing
+    // to compare against) — check both a nested `Auction` object and the
+    // response root, and only overwrite columns the response actually set.
+    const src = details?.Auction || details || {};
+
+    let raw;
+    try {
+      raw = JSON.parse(rows[0].raw_data || '{}');
+    } catch {
+      raw = {};
+    }
+    raw.details = details;
+    raw.auction = { ...raw.auction, ...src };
+
+    const fields: Record<string, any> = {
+      auction_number:     src.AuctionNumber,
+      short_description:  src.ShortDescription,
+      status:             src.Status,
+      status_translation: src.StatusTranslation,
+      starting_price:     src.StartingPrice,
+      start_date:         src.StartDate,
+      end_date:           src.EndDate,
+      property_type:      src.PropertyType,
+      is_first_sale:      typeof src.IsFirstSale === 'boolean' ? (src.IsFirstSale ? 1 : 0) : undefined,
+      place_name:         details?.Place?.Name,
+      place_municipality: details?.Place?.Municipality,
+    };
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    for (const [col, val] of Object.entries(fields)) {
+      if (val !== undefined && val !== null && val !== '') {
+        values.push(val);
+        setClauses.push(`${col} = $${values.length}`);
+      }
+    }
+    values.push(JSON.stringify(raw));
+    setClauses.push(`raw_data = $${values.length}`);
+    setClauses.push('details_fetched = 1');
+    values.push(id);
+
+    await this.db.query(
+      `UPDATE auctions SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
+      values,
+    );
+
+    const { rows: updated } = await this.db.query(
+      `SELECT id, auction_number, short_description, place_name, place_municipality,
+              status, status_translation, starting_price, start_date, end_date,
+              property_type, is_first_sale, details_fetched, added_at
+       FROM auctions WHERE id = $1`,
+      [id],
+    );
+    return updated[0];
+  }
 
   async runRefresh(onProgress: (msg: string, pct: number) => void = () => {}) {
     onProgress('Preuzimanje liste aukcija...', 0);

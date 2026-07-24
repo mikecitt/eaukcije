@@ -314,19 +314,34 @@ tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: #f8fafc; }
 
 td.col-num { color: var(--muted); font-size: 0.78rem; text-align: center; width: 32px; }
-td.col-fav { text-align: center; width: 30px; }
+td.col-fav { text-align: center; width: 52px; white-space: nowrap; }
 
 .fav-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.05rem;
-  line-height: 1;
   padding: 2px;
   color: var(--border);
 }
 .fav-star:hover { color: #f59e0b; }
 .fav-star.is-fav { color: #f59e0b; }
+
+.row-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 2px;
+  color: var(--border);
+}
+.row-refresh-btn:hover { color: #2563eb; }
+.row-refresh-btn:disabled { cursor: default; opacity: .6; animation: spin 0.75s linear infinite; }
 
 tr.fav-row { background: #fffbeb; }
 tr.fav-row:hover { background: #fef3c7; }

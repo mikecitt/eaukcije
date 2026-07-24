@@ -65,6 +65,6 @@ export function withFavoritesFirst(data: Auction[], favoriteIds: Set<string>): A
 }
 
 export function populateStatusOptions(data: Auction[]): string[] {
-  return [...new Set(data.map(a => a.status_translation || a.status || '').filter(Boolean))]
+  return [...new Set(data.map(a => a.status || a.status_translation || '').filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'sr'));
 }

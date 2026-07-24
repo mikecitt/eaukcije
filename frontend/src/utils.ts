@@ -40,12 +40,30 @@ export const fmtPrice = (val?: number | null): string => {
   return new Intl.NumberFormat('sr-RS', { style: 'currency', currency: 'RSD', maximumFractionDigits: 0 }).format(val);
 };
 
+// Exact status codes as returned by GetAuctionsByCategoryId's `Status` field
+// (confirmed from the live status filter dropdown, not translated text).
+const STATUS_BADGE_MAP: Record<string, string> = {
+  verified:              'badge-verified',
+  inprogress:            'badge-verified',
+  verification:          'badge-unverified',
+  inprediction:          'badge-unverified',
+  closed:                'badge-completed',
+  closedwithoutbids:     'badge-default',
+  canceled:              'badge-cancelled',
+  canceledbysystem:      'badge-cancelled',
+  unsuccessfullystarted: 'badge-cancelled',
+};
+
 export const statusBadgeClass = (status?: string, translation?: string): string => {
-  const t = stripDiacritics(cyrToLat(translation || status || '').toLowerCase());
-  if (t.includes('potvrđ') || t.includes('potvrd') || t.includes('aktiv')) return 'badge-verified';
+  const known = STATUS_BADGE_MAP[(status || '').trim().toLowerCase()];
+  if (known) return known;
+
+  // Fallback keyword heuristic for any status/translation not in the known set above.
+  const t = stripDiacritics(cyrToLat(status || translation || '').toLowerCase());
+  if (t.includes('potvrđ') || t.includes('potvrd') || t.includes('aktiv') || t.includes('verif')) return 'badge-verified';
   if (t.includes('otkaz') || t.includes('cancel')) return 'badge-cancelled';
-  if (t.includes('zavrs') || t.includes('complet')) return 'badge-completed';
-  if (t.includes('ceka') || t.includes('pending') || t.includes('objavlj')) return 'badge-unverified';
+  if (t.includes('zavrs') || t.includes('complet') || t.includes('closed')) return 'badge-completed';
+  if (t.includes('ceka') || t.includes('pending') || t.includes('objavlj') || t.includes('predict')) return 'badge-unverified';
   return 'badge-default';
 };
 

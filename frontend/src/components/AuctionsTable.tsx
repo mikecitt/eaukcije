@@ -2,11 +2,12 @@ import { Fragment } from 'react';
 import type { Auction } from '../types';
 import { fmtDate, fmtDateTime, fmtPrice, statusBadgeClass, cyrToLat } from '../utils';
 import type { SortCol } from '../filtering';
+import { StarIcon, RefreshIcon } from './icons';
 
 const COLUMNS: { col: SortCol; label: string }[] = [
   { col: 'auction_number', label: 'Br. aukcije' },
   { col: 'place_name', label: 'Mesto' },
-  { col: 'status_translation', label: 'Status' },
+  { col: 'status', label: 'Status' },
   { col: 'starting_price', label: 'Poc. cena' },
   { col: 'start_date', label: 'Pocetak' },
   { col: 'end_date', label: 'Kraj' },
@@ -27,7 +28,7 @@ function SortableTh({ col, label, sortCol, sortDir, onSort }: {
 
 export default function AuctionsTable({
   slice, startIndex, hasAny, hasAnyTotal, favoriteIds, onToggleFavorite,
-  sortCol, sortDir, onSort,
+  sortCol, sortDir, onSort, isAdmin, refreshingIds, onRefreshAuction,
 }: {
   slice: Auction[];
   startIndex: number;
@@ -38,6 +39,9 @@ export default function AuctionsTable({
   sortCol: SortCol;
   sortDir: 'asc' | 'desc';
   onSort: (col: SortCol) => void;
+  isAdmin: boolean;
+  refreshingIds: Set<string>;
+  onRefreshAuction: (id: string) => void;
 }) {
   let prevIsFav: boolean | null = null;
 
@@ -84,8 +88,18 @@ export default function AuctionsTable({
                       title={isFav ? 'Ukloni iz favorita' : 'Dodaj u favorite'}
                       onClick={() => onToggleFavorite(a.id)}
                     >
-                      {isFav ? '★' : '☆'}
+                      <StarIcon filled={isFav} />
                     </button>
+                    {isAdmin && (
+                      <button
+                        className="row-refresh-btn"
+                        title="Osveži ovu aukciju"
+                        disabled={refreshingIds.has(a.id)}
+                        onClick={() => onRefreshAuction(a.id)}
+                      >
+                        <RefreshIcon />
+                      </button>
+                    )}
                   </td>
                   <td className="col-num">{startIndex + i + 1}</td>
                   <td>
@@ -98,7 +112,7 @@ export default function AuctionsTable({
                     <span className="place-name">{a.place_name || '—'}</span>
                     {a.place_municipality && <span className="place-muni">{a.place_municipality}</span>}
                   </td>
-                  <td><span className={`badge ${statusBadgeClass(a.status, a.status_translation)}`}>{cyrToLat(a.status_translation || a.status || '—')}</span></td>
+                  <td><span className={`badge ${statusBadgeClass(a.status, a.status_translation)}`}>{cyrToLat(a.status || a.status_translation || '—')}</span></td>
                   <td className="col-price">{fmtPrice(a.starting_price)}</td>
                   <td className="col-date">{fmtDate(a.start_date)}</td>
                   <td className="col-date">{fmtDate(a.end_date)}</td>
