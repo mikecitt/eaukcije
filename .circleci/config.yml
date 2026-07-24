@@ -5,15 +5,18 @@ jobs:
     docker:
       - image: cimg/node:lts
         environment:
-          DATABASE_URL: postgres://eaukcije:eaukcije@localhost:5432/eaukcije
+          DATABASE_URL: postgres://eaukcije@localhost:5432/eaukcije
           JWT_SECRET: circleci_test_secret_do_not_use_in_prod
           DB_REMOVE_PASSWORD: circleci_test_remove_password
           ADMIN_DEFAULT_PASSWORD: circleci_test_admin_password
       - image: cimg/postgres:16.11
         environment:
           POSTGRES_USER: eaukcije
-          POSTGRES_PASSWORD: eaukcije
           POSTGRES_DB: eaukcije
+          # No password: this container is ephemeral, exists only for the
+          # lifetime of the CI job, and is unreachable outside it — trust
+          # auth avoids storing a throwaway credential in the repo at all.
+          POSTGRES_HOST_AUTH_METHOD: trust
     steps:
       - checkout
 
